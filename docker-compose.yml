@@ -1,0 +1,221 @@
+version: "3.9"
+
+services:
+  # =============================================================================
+  # LLM Inference Service (vLLM)
+  # =============================================================================
+  llm:
+    build:
+      context: ./services/llm
+      dockerfile: Dockerfile
+    container_name: mindfu-llm
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - MODEL_REPO=${MODEL_REPO:-unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF}
+      - MODEL_FILE=${MODEL_FILE:-Devstral-Small-2-24B-Instruct-2512-Q4_K_M.gguf}
+      - N_CTX=${N_CTX:-8192}
+      - N_GPU_LAYERS=${N_GPU_LAYERS:--1}
+      - HF_TOKEN=${HF_TOKEN:-}
+    volumes:
+      - model-cache:/root/.cache/huggingface
+      - ./data/models:/models
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Vector Database (Qdrant)
+  # =============================================================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mindfu-qdrant
+    volumes:
+      - qdrant-data:/qdrant/storage
+      - ./configs/qdrant:/qdrant/config:ro
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # PostgreSQL (Conversation Logs & Metadata)
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: mindfu-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-mindfu}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mindfu_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-mindfu}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mindfu}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Redis (Caching)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: mindfu-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # RAG Service (FastAPI)
+  # =============================================================================
+  rag:
+    build:
+      context: ./services/rag
+      dockerfile: Dockerfile
+    container_name: mindfu-rag
+    environment:
+      - LLM_BASE_URL=http://llm:8000/v1
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-mindfu}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mindfu_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-mindfu}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
+      - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-true}
+    volumes:
+      - ./data/documents:/app/documents
+      - ./data/conversations:/app/conversations
+      - embedding-cache:/root/.cache/huggingface
+    ports:
+      - "8080:8080"
+    depends_on:
+      qdrant:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # MLflow (Experiment Tracking)
+  # =============================================================================
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.14.1
+    container_name: mindfu-mlflow
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    volumes:
+      - mlflow-artifacts:/mlflow
+    ports:
+      - "5000:5000"
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Training Service (Unsloth)
+  # =============================================================================
+  training:
+    build:
+      context: ./services/training
+      dockerfile: Dockerfile
+    container_name: mindfu-training
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - RUN_API=true
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-mindfu}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mindfu_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-mindfu}
+      # L40S (48GB) can train Devstral Small 2 (24B) directly
+      - BASE_MODEL=${TRAINING_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
+    volumes:
+      - model-cache:/root/.cache/huggingface
+      - ./data/models:/models
+      - ./data/conversations:/conversations
+    ports:
+      - "5001:5001"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    profiles:
+      - training
+    networks:
+      - mindfu-network
+    restart: "no"
+
+volumes:
+  model-cache:
+  qdrant-data:
+  postgres-data:
+  redis-data:
+  mlflow-artifacts:
+  embedding-cache:
+
+networks:
+  mindfu-network:
+    driver: bridge

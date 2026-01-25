@@ -1,0 +1,27 @@
+# =============================================================================
+# MindFu Docker Compose Override - Local Development
+# =============================================================================
+# This file contains development-specific overrides
+# It is automatically loaded by docker-compose
+
+version: "3.9"
+
+services:
+  # Development overrides for RAG service
+  rag:
+    volumes:
+      # Mount source code for hot reload
+      - ./services/rag/src:/app/src:ro
+    environment:
+      - LOG_LEVEL=DEBUG
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+
+  # Expose PostgreSQL for local access
+  postgres:
+    ports:
+      - "5432:5432"
+
+  # Expose Redis for local access
+  redis:
+    ports:
+      - "6379:6379"
