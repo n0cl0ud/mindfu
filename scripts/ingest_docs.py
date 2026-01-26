@@ -10,8 +10,10 @@ Usage:
 """
 import argparse
 import hashlib
+import json
 import re
 import time
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -131,6 +133,19 @@ def crawl_site(base_url: str, max_pages: int = 500) -> dict[str, str]:
     return pages
 
 
+def save_cache(pages: dict[str, str], cache_file: str):
+    """Save crawled pages to cache file."""
+    Path(cache_file).write_text(json.dumps(pages, indent=2, ensure_ascii=False))
+    print(f"Saved {len(pages)} pages to {cache_file}")
+
+
+def load_cache(cache_file: str) -> dict[str, str]:
+    """Load crawled pages from cache file."""
+    pages = json.loads(Path(cache_file).read_text())
+    print(f"Loaded {len(pages)} pages from {cache_file}")
+    return pages
+
+
 def ingest_to_rag(
     pages: dict[str, str],
     rag_url: str,
@@ -212,11 +227,29 @@ def main():
         action="store_true",
         help="Crawl only, don't ingest"
     )
+    parser.add_argument(
+        "--cache",
+        default=None,
+        help="Cache file to save/load crawled pages (JSON)"
+    )
+    parser.add_argument(
+        "--from-cache",
+        action="store_true",
+        help="Load pages from cache file instead of crawling"
+    )
 
     args = parser.parse_args()
 
-    # Crawl the site
-    pages = crawl_site(args.url, max_pages=args.max_pages)
+    # Load from cache or crawl
+    if args.from_cache:
+        if not args.cache:
+            print("Error: --from-cache requires --cache <file>")
+            return
+        pages = load_cache(args.cache)
+    else:
+        pages = crawl_site(args.url, max_pages=args.max_pages)
+        if args.cache:
+            save_cache(pages, args.cache)
 
     if args.dry_run:
         print("\nDry run - pages that would be ingested:")
