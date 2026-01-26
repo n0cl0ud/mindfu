@@ -99,25 +99,6 @@ async def chat_completions(request: ChatCompletionRequest):
             tool_choice=request.tool_choice,
         )
 
-        # Format response
-        response = ChatCompletionResponse(
-            id=result.get("id", f"chatcmpl-{uuid.uuid4().hex[:8]}"),
-            created=result.get("created", int(datetime.now().timestamp())),
-            model=result.get("model", request.model),
-            choices=[
-                ChatChoice(
-                    index=i,
-                    message=ChatMessage(
-                        role=choice["message"]["role"],
-                        content=choice["message"]["content"],
-                    ),
-                    finish_reason=choice.get("finish_reason"),
-                )
-                for i, choice in enumerate(result.get("choices", []))
-            ],
-            usage=ChatUsage(**result["usage"]) if result.get("usage") else None,
-        )
-
         # Log conversation in background
         response_content = None
         response_tool_calls = None
@@ -142,13 +123,8 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         )
 
-        # Add RAG context if available
-        if "_rag_context" in result:
-            response_dict = response.model_dump()
-            response_dict["_rag_context"] = result["_rag_context"]
-            return response_dict
-
-        return response
+        # Return raw LLM response with RAG context (preserves all vLLM fields)
+        return result
 
     except Exception as e:
         logger.exception("Chat completion error")
