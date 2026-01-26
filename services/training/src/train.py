@@ -1,9 +1,7 @@
 """
-MindFu Training Service - Unsloth Fine-tuning with QLoRA
+MindFu Training Service - QLoRA Fine-tuning with HuggingFace
+Uses transformers + peft + trl (no unsloth dependency)
 """
-# Import unsloth first to apply optimizations
-from unsloth import FastLanguageModel
-
 import json
 import logging
 import os
@@ -14,8 +12,13 @@ from typing import Optional
 import mlflow
 import torch
 from datasets import Dataset
-from peft import LoraConfig
-from transformers import TrainingArguments
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    TrainingArguments,
+)
 from trl import SFTTrainer
 
 logging.basicConfig(
@@ -39,11 +42,11 @@ class TrainingConfig:
         self.lora_dropout = float(os.getenv("LORA_DROPOUT", "0.05"))
 
         # Training config
-        self.batch_size = int(os.getenv("BATCH_SIZE", "4"))
-        self.gradient_accumulation_steps = int(os.getenv("GRADIENT_ACCUMULATION_STEPS", "4"))
+        self.batch_size = int(os.getenv("BATCH_SIZE", "2"))
+        self.gradient_accumulation_steps = int(os.getenv("GRADIENT_ACCUMULATION_STEPS", "8"))
         self.learning_rate = float(os.getenv("LEARNING_RATE", "2e-4"))
         self.num_epochs = int(os.getenv("NUM_EPOCHS", "3"))
-        self.max_seq_length = int(os.getenv("MAX_SEQ_LENGTH", "4096"))
+        self.max_seq_length = int(os.getenv("MAX_SEQ_LENGTH", "2048"))
         self.warmup_ratio = float(os.getenv("WARMUP_RATIO", "0.03"))
 
         # 4-bit quantization
@@ -78,28 +81,37 @@ def load_conversations(conversations_dir: str) -> list:
     return conversations
 
 
-def format_conversation(conversation: dict) -> str:
-    """Format a conversation for training in chat format."""
-    messages = conversation.get("messages", [])
-    response = conversation.get("response", {})
+def format_for_instruct(item: dict) -> str:
+    """Format item for instruction tuning (Alpaca-style or chat format)."""
+    # Handle Alpaca-style format
+    if "instruction" in item:
+        instruction = item.get("instruction", "")
+        input_text = item.get("input", "")
+        output = item.get("output", "")
 
-    # Build the conversation string
+        if input_text:
+            return f"### Instruction:\n{instruction}\n\n### Input:\n{input_text}\n\n### Response:\n{output}"
+        else:
+            return f"### Instruction:\n{instruction}\n\n### Response:\n{output}"
+
+    # Handle chat format
+    messages = item.get("messages", [])
+    response = item.get("response", {})
+
     formatted = ""
-
     for msg in messages:
         role = msg.get("role", "user")
         content = msg.get("content", "")
 
         if role == "system":
-            formatted += f"<|system|>\n{content}</s>\n"
+            formatted += f"### System:\n{content}\n\n"
         elif role == "user":
-            formatted += f"<|user|>\n{content}</s>\n"
+            formatted += f"### Instruction:\n{content}\n\n"
         elif role == "assistant":
-            formatted += f"<|assistant|>\n{content}</s>\n"
+            formatted += f"### Response:\n{content}\n\n"
 
-    # Add the response
     if response:
-        formatted += f"<|assistant|>\n{response.get('content', '')}</s>"
+        formatted += f"### Response:\n{response.get('content', '')}"
 
     return formatted
 
@@ -110,7 +122,7 @@ def prepare_dataset(conversations: list) -> Dataset:
 
     for conv in conversations:
         try:
-            text = format_conversation(conv)
+            text = format_for_instruct(conv)
             if text.strip():
                 formatted.append({"text": text})
         except Exception as e:
@@ -119,14 +131,14 @@ def prepare_dataset(conversations: list) -> Dataset:
     if not formatted:
         # Add a placeholder if no conversations
         formatted.append({
-            "text": "<|user|>\nHello</s>\n<|assistant|>\nHello! How can I help you today?</s>"
+            "text": "### Instruction:\nHello\n\n### Response:\nHello! How can I help you today?"
         })
 
     return Dataset.from_list(formatted)
 
 
 def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
-    """Run fine-tuning with Unsloth."""
+    """Run QLoRA fine-tuning with HuggingFace stack."""
     logger.info("Starting training...")
     logger.info(f"Base model: {config.base_model}")
     logger.info(f"Output directory: {config.output_dir}")
@@ -146,19 +158,44 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
             "num_epochs": config.num_epochs,
         })
 
-        # Load model with Unsloth
-        logger.info("Loading model with Unsloth...")
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=config.base_model,
-            max_seq_length=config.max_seq_length,
-            dtype=None,  # Auto-detect
-            load_in_4bit=config.load_in_4bit,
+        # Configure 4-bit quantization
+        bnb_config = None
+        if config.load_in_4bit:
+            logger.info("Configuring 4-bit quantization...")
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
+                bnb_4bit_use_double_quant=True,
+            )
+
+        # Load tokenizer
+        logger.info("Loading tokenizer...")
+        tokenizer = AutoTokenizer.from_pretrained(
+            config.base_model,
+            trust_remote_code=True,
         )
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "right"
+
+        # Load model
+        logger.info("Loading model...")
+        model = AutoModelForCausalLM.from_pretrained(
+            config.base_model,
+            quantization_config=bnb_config,
+            device_map="auto",
+            trust_remote_code=True,
+            torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
+        )
+
+        # Prepare model for k-bit training
+        if config.load_in_4bit:
+            model = prepare_model_for_kbit_training(model)
 
         # Configure LoRA
         logger.info("Configuring LoRA...")
-        model = FastLanguageModel.get_peft_model(
-            model,
+        lora_config = LoraConfig(
             r=config.lora_rank,
             lora_alpha=config.lora_alpha,
             lora_dropout=config.lora_dropout,
@@ -167,9 +204,11 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
                 "gate_proj", "up_proj", "down_proj",
             ],
             bias="none",
-            use_gradient_checkpointing="unsloth",
-            random_state=42,
+            task_type="CAUSAL_LM",
         )
+
+        model = get_peft_model(model, lora_config)
+        model.print_trainable_parameters()
 
         # Prepare dataset
         if dataset is None:
@@ -191,11 +230,13 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
             save_strategy="epoch",
             fp16=not torch.cuda.is_bf16_supported(),
             bf16=torch.cuda.is_bf16_supported(),
-            optim="adamw_8bit",
+            optim="paged_adamw_8bit",
             weight_decay=0.01,
             lr_scheduler_type="cosine",
             seed=42,
             report_to="mlflow",
+            gradient_checkpointing=True,
+            max_grad_norm=0.3,
         )
 
         # Create trainer
@@ -206,6 +247,7 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
             dataset_text_field="text",
             max_seq_length=config.max_seq_length,
             args=training_args,
+            packing=False,
         )
 
         # Train
@@ -224,17 +266,15 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
         output_path = Path(config.output_dir) / datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # Save in multiple formats
-        model.save_pretrained(str(output_path / "lora"))
+        # Save LoRA adapter
+        trainer.save_model(str(output_path / "lora"))
         tokenizer.save_pretrained(str(output_path / "lora"))
 
-        # Save merged model for vLLM
-        logger.info("Merging and saving for vLLM...")
-        model.save_pretrained_merged(
-            str(output_path / "merged"),
-            tokenizer,
-            save_method="merged_16bit",
-        )
+        # Merge and save full model
+        logger.info("Merging LoRA weights...")
+        merged_model = trainer.model.merge_and_unload()
+        merged_model.save_pretrained(str(output_path / "merged"))
+        tokenizer.save_pretrained(str(output_path / "merged"))
 
         mlflow.log_artifact(str(output_path))
         logger.info(f"Model saved to {output_path}")

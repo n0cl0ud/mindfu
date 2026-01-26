@@ -1,5 +1,5 @@
 # =============================================================================
-# MindFu Training Service - Unsloth with QLoRA
+# MindFu Training Service - QLoRA with HuggingFace Stack
 # Target: L40S (Ada Lovelace sm_89) - 48GB VRAM
 # =============================================================================
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
@@ -10,9 +10,6 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 # Ada Lovelace (L40S) + Hopper (H100) support
 ENV TORCH_CUDA_ARCH_LIST="8.9;9.0"
-# Disable Unsloth torch.compile (incompatible with PyTorch stable)
-ENV UNSLOTH_COMPILE_DISABLE=1
-ENV TORCHINDUCTOR_COMPILE_THREADS=1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -39,11 +36,7 @@ COPY requirements.txt .
 # Install PyTorch stable with CUDA 12.4 (L40S / Ada Lovelace sm_89)
 RUN python3.11 -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-# Install Unsloth and dependencies
-RUN python3.11 -m pip install --no-cache-dir unsloth_zoo \
-    && python3.11 -m pip install --no-cache-dir "unsloth @ git+https://github.com/unslothai/unsloth.git"
-
-# Install remaining dependencies
+# Install remaining dependencies (no unsloth)
 RUN python3.11 -m pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
