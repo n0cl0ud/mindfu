@@ -222,13 +222,14 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
         model_type = getattr(model_config, 'model_type', None)
         logger.info(f"Model type: {model_type}")
 
-        # Try loading with specific model class for Mistral3/Devstral
+        # Try loading with specific model class for Mistral3/Ministral3/Devstral
         model = None
-        if model_type in ['mistral3', 'devstral']:
+        if model_type in ['mistral3', 'ministral3', 'devstral']:
+            # Try Ministral3ForCausalLM (note the 'i' - transformers naming)
             try:
-                from transformers import Mistral3ForCausalLM
-                logger.info("Loading with Mistral3ForCausalLM...")
-                model = Mistral3ForCausalLM.from_pretrained(
+                from transformers import Ministral3ForCausalLM
+                logger.info("Loading with Ministral3ForCausalLM...")
+                model = Ministral3ForCausalLM.from_pretrained(
                     config.base_model,
                     quantization_config=bnb_config,
                     device_map="auto",
@@ -236,9 +237,9 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
                     torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
                 )
             except ImportError:
-                logger.warning("Mistral3ForCausalLM not available in this transformers version")
+                logger.warning("Ministral3ForCausalLM not available")
             except Exception as e:
-                logger.warning(f"Mistral3ForCausalLM failed: {e}")
+                logger.warning(f"Ministral3ForCausalLM failed: {e}")
 
         # Fall back to AutoModelForCausalLM
         if model is None:
