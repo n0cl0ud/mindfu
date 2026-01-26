@@ -12,8 +12,9 @@
 
 | Component | Hardware | Purpose |
 |-----------|----------|---------|
-| **Inference** | RTX 5080 (16GB) local | Devstral Small 2 (24B) GGUF via llama.cpp |
-| **Training** | L40S (48GB) cloud | Devstral Small 2 QLoRA fine-tuning via Unsloth |
+| **Inference (GGUF)** | RTX 5080 (16GB) local | Devstral Small 2 (24B) GGUF via llama.cpp |
+| **Inference (vLLM)** | L40S/A100+ (48GB+) | Devstral Small 2 (24B) full precision via vLLM |
+| **Training** | L40S (48GB) cloud | Devstral Small 2 QLoRA fine-tuning |
 | **RAG/Vector** | Local | Qdrant + PostgreSQL |
 
 ### Why Hybrid?
@@ -30,15 +31,28 @@
 
 ## Quick Commands
 
+### GGUF Stack (RTX 5080, RTX 4090 - consumer GPUs)
 ```bash
-# Start inference services (local)
-docker compose up -d
+# Start llama.cpp + RAG (port 11434)
+docker compose --profile gguf up -d
 
 # View logs
 docker compose logs -f rag
 
 # Stop all
-docker compose down
+docker compose --profile gguf down
+```
+
+### vLLM Stack (L40S, A100, H100 - datacenter GPUs)
+```bash
+# Start vLLM + RAG (port 11434)
+docker compose --profile vllm up -d
+
+# View logs
+docker compose logs -f rag-vllm
+
+# Stop all
+docker compose --profile vllm down
 ```
 
 ### Training (on L40S)
@@ -61,20 +75,29 @@ curl -X POST http://localhost:5001/train/start \
 
 ## Service Endpoints
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| RAG API | http://localhost:11434 | OpenAI-compatible with RAG |
-| LLM | http://localhost:8000 | Direct llama.cpp access |
-| Qdrant | http://localhost:6333 | Vector database UI |
-| MLflow | http://localhost:5000 | Training experiments |
-| Training | http://localhost:5001 | Fine-tuning API |
+| Service | URL | Profile | Purpose |
+|---------|-----|---------|---------|
+| RAG API | http://localhost:11434 | gguf/vllm | OpenAI-compatible with RAG |
+| LLM (llama.cpp) | http://localhost:8000 | gguf | Direct llama.cpp access |
+| LLM (vLLM) | http://localhost:8000 | vllm | Direct vLLM access |
+| Qdrant | http://localhost:6333 | - | Vector database UI |
+| MLflow | http://localhost:5000 | - | Training experiments |
+| Training | http://localhost:5001 | training | Fine-tuning API |
 
 ## Development Notes
 
-### LLM Service (`services/llm/`)
+### LLM Service - llama.cpp (`services/llm/`)
 - Native llama.cpp server (not llama-cpp-python)
 - Compiled with CUDA for RTX 5080 (sm_89/90 fallback)
 - Devstral-Small-2-24B-Instruct-2512 GGUF Q4_K_M (~14GB)
+- Best for: Consumer GPUs with 16-24GB VRAM
+
+### LLM Service - vLLM (profile: vllm)
+- Official vLLM OpenAI-compatible server
+- Devstral-Small-2-24B-Instruct-2512 full precision (~48GB)
+- Features: Tool calling, prefix caching, chunked prefill, FP8 KV cache
+- Best for: Datacenter GPUs (L40S, A100, H100) with 48GB+ VRAM
+- 81K context length with `--max-model-len 81920`
 
 ### RAG Service (`services/rag/`)
 - FastAPI application with OpenAI-compatible endpoints
@@ -85,9 +108,9 @@ curl -X POST http://localhost:5001/train/start \
 ### Training Service (`services/training/`)
 - **Target GPU:** L40S / A100 / H100 (Ada/Hopper architecture)
 - PyTorch stable + CUDA 12.4
-- Unsloth for efficient QLoRA fine-tuning
+- HuggingFace transformers + peft + trl for QLoRA fine-tuning
 - MLflow for experiment tracking
-- Trains Devstral-Small-2-24B-Instruct-2512 with 4-bit quantization
+- Trains Devstral-Small-2-24B-Instruct-2512 with 4-bit quantization (BitsAndBytes)
 
 ## API Usage
 
@@ -117,18 +140,18 @@ services/
 │   ├── src/api/documents.py # Document upload/query
 │   └── src/core/rag_chain.py # RAG implementation
 └── training/
-    ├── Dockerfile          # PyTorch + Unsloth for L40S
-    ├── src/train.py        # Unsloth fine-tuning
+    ├── Dockerfile          # PyTorch + CUDA 12.4 for L40S
+    ├── src/train.py        # QLoRA fine-tuning with peft/trl
     ├── src/data_prep.py    # Conversation processing
     └── src/export.py       # Model export
 ```
 
 ## GPU Compatibility Matrix
 
-| GPU | Architecture | Inference | Training |
-|-----|--------------|-----------|----------|
-| RTX 5080/5090 | Blackwell sm_120 | ✅ llama.cpp | ❌ PyTorch not ready |
-| L40S | Ada sm_89 | ✅ | ✅ |
-| A100 | Ampere sm_80 | ✅ | ✅ |
-| H100 | Hopper sm_90 | ✅ | ✅ |
-| RTX 4090 | Ada sm_89 | ✅ | ✅ |
+| GPU | Architecture | llama.cpp (GGUF) | vLLM | Training |
+|-----|--------------|------------------|------|----------|
+| RTX 5080/5090 | Blackwell sm_120 | ✅ | ❌ PyTorch not ready | ❌ |
+| RTX 4090 | Ada sm_89 | ✅ | ⚠️ 24GB limited | ✅ |
+| L40S | Ada sm_89 | ✅ | ✅ 48GB | ✅ |
+| A100 | Ampere sm_80 | ✅ | ✅ 40/80GB | ✅ |
+| H100 | Hopper sm_90 | ✅ | ✅ 80GB | ✅ |
