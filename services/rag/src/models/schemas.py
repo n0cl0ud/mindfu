@@ -45,6 +45,12 @@ class Tool(BaseModel):
     function: ToolFunction
 
 
+class StreamOptions(BaseModel):
+    """Stream options for including usage in streaming responses."""
+
+    include_usage: bool = False
+
+
 class ChatCompletionRequest(BaseModel):
     """OpenAI-compatible chat completion request."""
 
@@ -53,6 +59,7 @@ class ChatCompletionRequest(BaseModel):
     temperature: float = Field(default=0.7, ge=0, le=2)
     max_tokens: Optional[int] = Field(default=2048, ge=1)
     stream: bool = False
+    stream_options: Optional[StreamOptions] = None
     top_p: float = Field(default=1.0, ge=0, le=1)
     frequency_penalty: float = Field(default=0, ge=-2, le=2)
     presence_penalty: float = Field(default=0, ge=-2, le=2)

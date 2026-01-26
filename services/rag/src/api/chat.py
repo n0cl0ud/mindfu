@@ -80,6 +80,7 @@ async def chat_completions(request: ChatCompletionRequest):
             return StreamingResponse(
                 stream_response(rag_chain, messages, request),
                 media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no"},
             )
 
         # Non-streaming response
@@ -152,6 +153,7 @@ async def stream_response(
             stop=request.stop,
             tools=[t.model_dump() for t in request.tools] if request.tools else None,
             tool_choice=request.tool_choice,
+            stream_options=request.stream_options.model_dump() if request.stream_options else None,
         ):
             yield chunk
 
