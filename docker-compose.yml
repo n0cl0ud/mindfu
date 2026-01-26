@@ -176,8 +176,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-mindfu}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mindfu_secret}
       - POSTGRES_DB=${POSTGRES_DB:-mindfu}
-      # Mistral-7B for training (Devstral-24B 'ministral3' not yet in transformers)
-      - BASE_MODEL=${TRAINING_MODEL:-mistralai/Mistral-7B-Instruct-v0.3}
+      # L40S (48GB) can train Devstral Small 2 (24B) directly
+      - BASE_MODEL=${TRAINING_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
     volumes:
       - model-cache:/root/.cache/huggingface
       - ./data/models:/models

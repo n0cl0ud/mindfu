@@ -4,8 +4,8 @@
 
 # Note: torch is installed separately in Dockerfile
 
-# Transformers ecosystem - pin to stable version with Mistral3 support
-transformers>=4.48.0,<5.0.0
+# Transformers ecosystem - install from git for ministral3/Devstral support
+transformers @ git+https://github.com/huggingface/transformers.git
 datasets>=3.0.0
 accelerate>=0.34.0
 peft>=0.13.0
