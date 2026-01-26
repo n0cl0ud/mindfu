@@ -72,7 +72,7 @@ def get_page_content(url: str) -> tuple[str, list[str]]:
     return content, links
 
 
-def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None, cache_file: str = None) -> dict[str, str]:
+def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None, cache_file: str = None, delay: float = 0.1) -> dict[str, str]:
     """Crawl a documentation site starting from base_url."""
     parsed_base = urlparse(base_url)
     base_domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
@@ -127,7 +127,8 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
                     to_visit.append(link)
 
             # Be polite
-            time.sleep(0.5)
+            if delay > 0:
+                time.sleep(delay)
 
             # Incremental cache save
             if cache_file and len(pages) % save_every == 0:
@@ -256,6 +257,12 @@ def main():
         default=[],
         help="URL patterns to exclude (can be used multiple times)"
     )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=0.1,
+        help="Delay between requests in seconds (default: 0.1, use 0 for no delay)"
+    )
 
     args = parser.parse_args()
 
@@ -266,7 +273,7 @@ def main():
             return
         pages = load_cache(args.cache)
     else:
-        pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude, cache_file=args.cache)
+        pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude, cache_file=args.cache, delay=args.delay)
 
     if args.dry_run:
         print("\nDry run - pages that would be ingested:")
