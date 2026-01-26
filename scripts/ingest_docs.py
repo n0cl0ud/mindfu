@@ -103,7 +103,6 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
             "/_static/", "/_sources/", "/_images/",
             ".pdf", ".zip", ".tar", ".gz",
             "/search.html", "/genindex.html",
-            "/scaladoc/", "/javadoc/", "/apidoc/", "/api-docs/",
         ]
         if exclude_patterns:
             skip_patterns.extend(exclude_patterns)
