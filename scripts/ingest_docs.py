@@ -72,7 +72,7 @@ def get_page_content(url: str) -> tuple[str, list[str]]:
     return content, links
 
 
-def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None, cache_file: str = None, delay: float = 0.1) -> dict[str, str]:
+def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None, cache_file: str = None, delay: float = 0.3) -> dict[str, str]:
     """Crawl a documentation site starting from base_url."""
     parsed_base = urlparse(base_url)
     base_domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
@@ -260,8 +260,8 @@ def main():
     parser.add_argument(
         "--delay",
         type=float,
-        default=0.1,
-        help="Delay between requests in seconds (default: 0.1, use 0 for no delay)"
+        default=0.3,
+        help="Delay between requests in seconds (default: 0.3, use 0 for no delay)"
     )
 
     args = parser.parse_args()
