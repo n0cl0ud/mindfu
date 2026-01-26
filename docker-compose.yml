@@ -5,9 +5,7 @@ services:
   # LLM Inference Service (vLLM)
   # =============================================================================
   llm:
-    build:
-      context: ./services/llm
-      dockerfile: Dockerfile
+    image: ghcr.io/n0cl0ud/mindfu-llm:latest
     container_name: mindfu-llm
     runtime: nvidia
     environment:
@@ -104,9 +102,7 @@ services:
   # RAG Service (FastAPI)
   # =============================================================================
   rag:
-    build:
-      context: ./services/rag
-      dockerfile: Dockerfile
+    image: ghcr.io/n0cl0ud/mindfu-rag:latest
     container_name: mindfu-rag
     environment:
       - LLM_BASE_URL=http://llm:8000/v1
@@ -168,9 +164,7 @@ services:
   # Training Service (Unsloth)
   # =============================================================================
   training:
-    build:
-      context: ./services/training
-      dockerfile: Dockerfile
+    image: ghcr.io/n0cl0ud/mindfu-training:latest
     container_name: mindfu-training
     runtime: nvidia
     environment:
