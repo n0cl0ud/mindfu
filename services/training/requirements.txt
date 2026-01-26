@@ -2,10 +2,10 @@
 # MindFu Training Service Dependencies
 # =============================================================================
 
-# Note: torch and unsloth are installed separately in Dockerfile
+# Note: torch is installed separately in Dockerfile
 
-# Transformers ecosystem
-transformers>=4.45.0
+# Transformers ecosystem - pin to stable version with Mistral3 support
+transformers>=4.48.0,<5.0.0
 datasets>=3.0.0
 accelerate>=0.34.0
 peft>=0.13.0

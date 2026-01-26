@@ -181,13 +181,45 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
 
         # Load model
         logger.info("Loading model...")
-        model = AutoModelForCausalLM.from_pretrained(
-            config.base_model,
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True,
-            torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
-        )
+
+        # First, check model config to determine the right class
+        from transformers import AutoConfig
+        model_config = AutoConfig.from_pretrained(config.base_model, trust_remote_code=True)
+        model_type = getattr(model_config, 'model_type', None)
+        logger.info(f"Model type: {model_type}")
+
+        # Try loading with specific model class for Mistral3/Devstral
+        model = None
+        if model_type in ['mistral3', 'devstral']:
+            try:
+                from transformers import Mistral3ForCausalLM
+                logger.info("Loading with Mistral3ForCausalLM...")
+                model = Mistral3ForCausalLM.from_pretrained(
+                    config.base_model,
+                    quantization_config=bnb_config,
+                    device_map="auto",
+                    trust_remote_code=True,
+                    torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
+                )
+            except ImportError:
+                logger.warning("Mistral3ForCausalLM not available in this transformers version")
+            except Exception as e:
+                logger.warning(f"Mistral3ForCausalLM failed: {e}")
+
+        # Fall back to AutoModelForCausalLM
+        if model is None:
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    config.base_model,
+                    quantization_config=bnb_config,
+                    device_map="auto",
+                    trust_remote_code=True,
+                    torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
+                )
+            except ValueError as e:
+                logger.error(f"AutoModelForCausalLM failed: {e}")
+                logger.info("Model may require a newer transformers version or different architecture")
+                raise
 
         # Prepare model for k-bit training
         if config.load_in_4bit:
