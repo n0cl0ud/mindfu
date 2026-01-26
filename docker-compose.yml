@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # PostgreSQL (Conversation Logs & Metadata)
+  # PostgreSQL (Conversation Logs & Metadata) - Only for logging/training
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -57,6 +57,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    profiles:
+      - logging
+      - training
     networks:
       - mindfu-network
     restart: unless-stopped
@@ -82,7 +85,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # MLflow (Experiment Tracking)
+  # MLflow (Experiment Tracking) - Only for training
   # ---------------------------------------------------------------------------
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.14.1
@@ -97,6 +100,8 @@ services:
       - mlflow-artifacts:/mlflow
     ports:
       - "5000:5000"
+    profiles:
+      - training
     networks:
       - mindfu-network
     restart: unless-stopped
@@ -172,8 +177,6 @@ services:
     depends_on:
       qdrant:
         condition: service_started
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       llm:
@@ -268,8 +271,6 @@ services:
     depends_on:
       qdrant:
         condition: service_started
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       llm-vllm:
