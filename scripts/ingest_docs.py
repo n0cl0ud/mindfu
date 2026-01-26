@@ -72,7 +72,7 @@ def get_page_content(url: str) -> tuple[str, list[str]]:
     return content, links
 
 
-def crawl_site(base_url: str, max_pages: int = 500) -> dict[str, str]:
+def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None) -> dict[str, str]:
     """Crawl a documentation site starting from base_url."""
     parsed_base = urlparse(base_url)
     base_domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
@@ -103,7 +103,10 @@ def crawl_site(base_url: str, max_pages: int = 500) -> dict[str, str]:
             "/_static/", "/_sources/", "/_images/",
             ".pdf", ".zip", ".tar", ".gz",
             "/search.html", "/genindex.html",
+            "/scaladoc/", "/javadoc/", "/apidoc/", "/api-docs/",
         ]
+        if exclude_patterns:
+            skip_patterns.extend(exclude_patterns)
         if any(pattern in url for pattern in skip_patterns):
             continue
 
@@ -237,6 +240,12 @@ def main():
         action="store_true",
         help="Load pages from cache file instead of crawling"
     )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="URL patterns to exclude (can be used multiple times)"
+    )
 
     args = parser.parse_args()
 
@@ -247,7 +256,7 @@ def main():
             return
         pages = load_cache(args.cache)
     else:
-        pages = crawl_site(args.url, max_pages=args.max_pages)
+        pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude)
         if args.cache:
             save_cache(pages, args.cache)
 
