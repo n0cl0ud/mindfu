@@ -84,7 +84,7 @@ def crawl_site(base_url: str, max_pages: int = 500) -> dict[str, str]:
     print(f"Starting crawl from: {base_url}")
     print(f"Base domain: {base_domain}")
 
-    while to_visit and len(visited) < max_pages:
+    while to_visit and (max_pages == 0 or len(visited) < max_pages):
         url = to_visit.pop(0)
 
         # Normalize URL (remove fragments)
@@ -219,8 +219,8 @@ def main():
     parser.add_argument(
         "--max-pages",
         type=int,
-        default=500,
-        help="Maximum number of pages to crawl (default: 500)"
+        default=0,
+        help="Maximum number of pages to crawl (0 = unlimited, default: 0)"
     )
     parser.add_argument(
         "--dry-run",
