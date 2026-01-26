@@ -32,7 +32,9 @@ class TrainingConfig:
     """Training configuration."""
 
     def __init__(self):
-        self.base_model = os.getenv("BASE_MODEL", "mistralai/Devstral-Small-2-24B-Instruct-2512")
+        # Note: Devstral-Small-2-24B uses 'ministral3' architecture not yet in transformers
+        # Using Mistral-7B as default until transformers adds ministral3 support
+        self.base_model = os.getenv("BASE_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
         self.output_dir = os.getenv("OUTPUT_DIR", "/models/fine-tuned")
         self.conversations_dir = os.getenv("CONVERSATIONS_DIR", "/conversations")
 
