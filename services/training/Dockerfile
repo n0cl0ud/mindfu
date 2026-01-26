@@ -10,6 +10,9 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 # Ada Lovelace (L40S) + Hopper (H100) support
 ENV TORCH_CUDA_ARCH_LIST="8.9;9.0"
+# Disable Unsloth torch.compile (incompatible with PyTorch stable)
+ENV UNSLOTH_COMPILE_DISABLE=1
+ENV TORCHINDUCTOR_COMPILE_THREADS=1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
