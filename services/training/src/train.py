@@ -171,29 +171,43 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
 
         # Load tokenizer
         logger.info("Loading tokenizer...")
+        tokenizer = None
+
+        # Try direct loading first
         try:
             tokenizer = AutoTokenizer.from_pretrained(
                 config.base_model,
                 trust_remote_code=True,
             )
-        except ValueError as e:
-            # Some models need use_fast=False or specific tokenizer
+        except (ValueError, Exception) as e:
             logger.warning(f"Default tokenizer loading failed: {e}")
-            logger.info("Trying with use_fast=False...")
+
+        # Fall back to compatible Mistral tokenizer
+        if tokenizer is None:
+            logger.info("Trying Mistral base tokenizer...")
             try:
+                # Use Mistral-7B tokenizer which is compatible with Devstral
                 tokenizer = AutoTokenizer.from_pretrained(
-                    config.base_model,
-                    trust_remote_code=True,
-                    use_fast=False,
-                )
-            except Exception:
-                # Fall back to LlamaTokenizer for Mistral-based models
-                logger.info("Trying LlamaTokenizerFast...")
-                from transformers import LlamaTokenizerFast
-                tokenizer = LlamaTokenizerFast.from_pretrained(
-                    config.base_model,
+                    "mistralai/Mistral-7B-Instruct-v0.3",
                     trust_remote_code=True,
                 )
+            except Exception as e2:
+                logger.warning(f"Mistral tokenizer failed: {e2}")
+
+        # Last resort: load tokenizer.json directly
+        if tokenizer is None:
+            logger.info("Trying direct tokenizer.json loading...")
+            from tokenizers import Tokenizer
+            from transformers import PreTrainedTokenizerFast
+            from huggingface_hub import hf_hub_download
+
+            tokenizer_path = hf_hub_download(
+                repo_id=config.base_model,
+                filename="tokenizer.json",
+            )
+            base_tokenizer = Tokenizer.from_file(tokenizer_path)
+            tokenizer = PreTrainedTokenizerFast(tokenizer_object=base_tokenizer)
+
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = "right"
