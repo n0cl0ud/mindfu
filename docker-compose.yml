@@ -127,7 +127,7 @@ services:
       - ./data/conversations:/app/conversations
       - embedding-cache:/root/.cache/huggingface
     ports:
-      - "8080:8080"
+      - "11434:8080"
     depends_on:
       qdrant:
         condition: service_started

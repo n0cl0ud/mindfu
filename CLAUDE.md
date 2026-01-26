@@ -63,7 +63,7 @@ curl -X POST http://localhost:5001/train/start \
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| RAG API | http://localhost:8080 | OpenAI-compatible with RAG |
+| RAG API | http://localhost:11434 | OpenAI-compatible with RAG |
 | LLM | http://localhost:8000 | Direct llama.cpp access |
 | Qdrant | http://localhost:6333 | Vector database UI |
 | MLflow | http://localhost:5000 | Training experiments |
@@ -93,15 +93,15 @@ curl -X POST http://localhost:5001/train/start \
 
 ```bash
 # Chat with RAG
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"devstral-small-2","messages":[{"role":"user","content":"Hello"}]}'
 
 # Upload document
-curl -X POST http://localhost:8080/v1/documents/upload -F "file=@doc.pdf"
+curl -X POST http://localhost:11434/v1/documents/upload -F "file=@doc.pdf"
 
 # Query documents
-curl -X POST http://localhost:8080/v1/documents/query \
+curl -X POST http://localhost:11434/v1/documents/query \
   -H "Content-Type: application/json" \
   -d '{"query":"your question"}'
 ```
