@@ -1,5 +1,3 @@
-version: "3.9"
-
 # =============================================================================
 # MindFu - Local LLM Infrastructure with RAG
 # =============================================================================
@@ -234,7 +232,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 300s
+      start_period: 600s  # 10 min - vLLM needs time to load 24B model
     profiles:
       - vllm
     networks:
