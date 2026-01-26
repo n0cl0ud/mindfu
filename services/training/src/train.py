@@ -171,10 +171,29 @@ def train(config: TrainingConfig, dataset: Optional[Dataset] = None):
 
         # Load tokenizer
         logger.info("Loading tokenizer...")
-        tokenizer = AutoTokenizer.from_pretrained(
-            config.base_model,
-            trust_remote_code=True,
-        )
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                config.base_model,
+                trust_remote_code=True,
+            )
+        except ValueError as e:
+            # Some models need use_fast=False or specific tokenizer
+            logger.warning(f"Default tokenizer loading failed: {e}")
+            logger.info("Trying with use_fast=False...")
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    config.base_model,
+                    trust_remote_code=True,
+                    use_fast=False,
+                )
+            except Exception:
+                # Fall back to LlamaTokenizer for Mistral-based models
+                logger.info("Trying LlamaTokenizerFast...")
+                from transformers import LlamaTokenizerFast
+                tokenizer = LlamaTokenizerFast.from_pretrained(
+                    config.base_model,
+                    trust_remote_code=True,
+                )
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         tokenizer.padding_side = "right"
