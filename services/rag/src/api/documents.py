@@ -1,6 +1,7 @@
 """
 MindFu Documents API - Document Upload and Indexing
 """
+import hashlib
 import logging
 import os
 import uuid
@@ -75,17 +76,55 @@ async def extract_text_from_file(file: UploadFile) -> str:
         return content.decode("utf-8")
 
 
-@router.post("/documents", response_model=DocumentUploadResponse)
+def compute_content_hash(content: str) -> str:
+    """Compute SHA256 hash of content."""
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+@router.post("/documents")
 async def upload_document(request: DocumentUploadRequest):
     """
     Upload and index a document for RAG.
 
     The document will be chunked and stored in the vector database.
+    Supports deduplication: if a document with the same source URL exists,
+    it will be skipped (same content) or updated (different content).
     """
     try:
         settings = get_settings()
         rag_chain = get_rag_chain()
         collection = request.collection or settings.default_collection
+
+        # Compute content hash for deduplication
+        content_hash = compute_content_hash(request.content)
+        source_url = request.metadata.get("source")
+
+        # Check for existing document with same source
+        action = "created"
+        if source_url:
+            existing = rag_chain.find_by_source(source_url, collection)
+            if existing:
+                existing_hash = existing[0].get("metadata", {}).get("content_hash")
+                if existing_hash == content_hash:
+                    # Same content, skip
+                    return {
+                        "action": "skipped",
+                        "reason": "content unchanged",
+                        "source": source_url,
+                        "collection": collection,
+                        "chunks_count": len(existing),
+                    }
+                else:
+                    # Different content, delete old and re-insert
+                    deleted = rag_chain.delete_by_source(source_url, collection)
+                    logger.info(f"Deleted {deleted} old chunks for {source_url}")
+                    action = "updated"
+
+        # Add content_hash to metadata
+        metadata = {
+            **request.metadata,
+            "content_hash": content_hash,
+        }
 
         if request.chunk:
             # Split into chunks
@@ -98,7 +137,7 @@ async def upload_document(request: DocumentUploadRequest):
                 documents.append({
                     "content": chunk,
                     "metadata": {
-                        **request.metadata,
+                        **metadata,
                         "chunk_index": i,
                         "total_chunks": len(chunks),
                     },
@@ -109,17 +148,19 @@ async def upload_document(request: DocumentUploadRequest):
             # Add as single document
             doc_id = rag_chain.add_document(
                 content=request.content,
-                metadata=request.metadata,
+                metadata=metadata,
                 collection=collection,
             )
             doc_ids = [doc_id]
             chunks = [request.content]
 
-        return DocumentUploadResponse(
-            document_ids=doc_ids,
-            chunks_created=len(chunks),
-            collection=collection,
-        )
+        return {
+            "action": action,
+            "document_ids": doc_ids,
+            "chunks_created": len(chunks),
+            "collection": collection,
+            "source": source_url,
+        }
 
     except Exception as e:
         logger.exception("Document upload error")

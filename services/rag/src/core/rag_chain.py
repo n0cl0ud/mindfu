@@ -264,6 +264,70 @@ Use this context to inform your response when relevant. If the context doesn't c
 
         return doc_id
 
+    def find_by_source(
+        self,
+        source_url: str,
+        collection: str | None = None,
+    ) -> List[dict]:
+        """Find documents by source URL in metadata."""
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        collection = collection or self.settings.default_collection
+
+        results = self.qdrant.scroll(
+            collection_name=collection,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="metadata.source",
+                        match=MatchValue(value=source_url),
+                    )
+                ]
+            ),
+            limit=1000,  # Max chunks per document
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        points = results[0] if results else []
+        return [
+            {
+                "id": p.id,
+                "content": p.payload.get("content", ""),
+                "metadata": p.payload.get("metadata", {}),
+            }
+            for p in points
+        ]
+
+    def delete_by_source(
+        self,
+        source_url: str,
+        collection: str | None = None,
+    ) -> int:
+        """Delete all documents with given source URL."""
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        collection = collection or self.settings.default_collection
+
+        # Get count before delete
+        existing = self.find_by_source(source_url, collection)
+        count = len(existing)
+
+        if count > 0:
+            self.qdrant.delete(
+                collection_name=collection,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="metadata.source",
+                            match=MatchValue(value=source_url),
+                        )
+                    ]
+                ),
+            )
+
+        return count
+
     def add_documents(
         self,
         documents: List[dict],

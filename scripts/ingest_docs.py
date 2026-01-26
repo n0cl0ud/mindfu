@@ -170,6 +170,8 @@ def ingest_to_rag(
     print(f"\nIngesting {len(pages)} pages to {rag_url}")
 
     success = 0
+    updated = 0
+    skipped = 0
     failed = 0
 
     with httpx.Client(timeout=60) as client:
@@ -198,13 +200,22 @@ def ingest_to_rag(
                     json=payload,
                 )
                 response.raise_for_status()
-                success += 1
-                print(f"  [{success}] Ingested: {url[:60]}...")
+                result = response.json()
+                action = result.get("action", "created")
+                if action == "skipped":
+                    skipped += 1
+                    print(f"  [SKIP] {url[:70]}...")
+                elif action == "updated":
+                    updated += 1
+                    print(f"  [UPDATE] {url[:70]}...")
+                else:
+                    success += 1
+                    print(f"  [NEW] {url[:70]}...")
             except Exception as e:
                 failed += 1
                 print(f"  [FAILED] {url}: {e}")
 
-    print(f"\nIngestion complete: {success} success, {failed} failed")
+    print(f"\nIngestion complete: {success} new, {updated} updated, {skipped} skipped, {failed} failed")
 
 
 def main():
