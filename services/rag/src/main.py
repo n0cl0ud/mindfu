@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import chat, documents, health
+from .api import chat, conversations, documents, health
 from .core.config import get_settings
 
 # Configure logging
@@ -39,6 +39,12 @@ async def lifespan(app: FastAPI):
     get_rag_chain()
     logger.info("RAG chain initialized")
 
+    # Initialize database (create tables if needed)
+    if settings.log_conversations:
+        from .core.database import init_database
+        await init_database()
+        logger.info("Conversation logging enabled")
+
     yield
 
     logger.info("Shutting down MindFu RAG Service...")
@@ -65,6 +71,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
+app.include_router(conversations.router)
 
 
 @app.get("/")
@@ -79,6 +86,7 @@ async def root():
             "models": "/v1/models",
             "documents": "/v1/documents",
             "collections": "/v1/collections",
+            "conversations": "/v1/conversations",
             "health": "/health",
         },
     }

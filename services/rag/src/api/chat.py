@@ -1,6 +1,7 @@
 """
 MindFu Chat API - OpenAI-Compatible Endpoints
 """
+import asyncio
 import json
 import logging
 import uuid
@@ -10,6 +11,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from ..core.config import get_settings
 from ..core.rag_chain import get_rag_chain
 from ..models.schemas import (
     ChatCompletionRequest,
@@ -21,6 +23,40 @@ from ..models.schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["chat"])
+
+
+async def log_conversation_async(
+    model: str,
+    messages: list,
+    response_content: str | None,
+    response_tool_calls: list | None,
+    finish_reason: str | None,
+    usage: dict | None,
+    rag_context: dict | None,
+):
+    """Log conversation in background (non-blocking)."""
+    try:
+        settings = get_settings()
+        if not settings.log_conversations:
+            return
+
+        from ..core.database import get_conversation_logger
+
+        conv_logger = get_conversation_logger()
+        await conv_logger.log_conversation(
+            model=model,
+            messages=messages,
+            response_content=response_content,
+            response_tool_calls=response_tool_calls,
+            finish_reason=finish_reason,
+            tokens_prompt=usage.get("prompt_tokens") if usage else None,
+            tokens_completion=usage.get("completion_tokens") if usage else None,
+            tokens_total=usage.get("total_tokens") if usage else None,
+            rag_contexts_used=rag_context.get("contexts_used", 0) if rag_context else 0,
+            rag_sources=rag_context.get("sources") if rag_context else None,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log conversation: {e}")
 
 
 @router.post("/chat/completions")
@@ -80,6 +116,30 @@ async def chat_completions(request: ChatCompletionRequest):
                 for i, choice in enumerate(result.get("choices", []))
             ],
             usage=ChatUsage(**result["usage"]) if result.get("usage") else None,
+        )
+
+        # Log conversation in background
+        response_content = None
+        response_tool_calls = None
+        finish_reason = None
+
+        if result.get("choices"):
+            first_choice = result["choices"][0]
+            message = first_choice.get("message", {})
+            response_content = message.get("content")
+            response_tool_calls = message.get("tool_calls")
+            finish_reason = first_choice.get("finish_reason")
+
+        asyncio.create_task(
+            log_conversation_async(
+                model=request.model,
+                messages=messages,
+                response_content=response_content,
+                response_tool_calls=response_tool_calls,
+                finish_reason=finish_reason,
+                usage=result.get("usage"),
+                rag_context=result.get("_rag_context"),
+            )
         )
 
         # Add RAG context if available
