@@ -59,6 +59,8 @@ async def chat_completions(request: ChatCompletionRequest):
             frequency_penalty=request.frequency_penalty,
             presence_penalty=request.presence_penalty,
             stop=request.stop,
+            tools=[t.model_dump() for t in request.tools] if request.tools else None,
+            tool_choice=request.tool_choice,
         )
 
         # Format response
@@ -112,6 +114,8 @@ async def stream_response(
             frequency_penalty=request.frequency_penalty,
             presence_penalty=request.presence_penalty,
             stop=request.stop,
+            tools=[t.model_dump() for t in request.tools] if request.tools else None,
+            tool_choice=request.tool_choice,
         ):
             yield chunk
 

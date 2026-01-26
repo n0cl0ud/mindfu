@@ -165,9 +165,17 @@ Use this context to inform your response when relevant. If the context doesn't c
                 "temperature": kwargs.get("temperature", 0.7),
                 "max_tokens": kwargs.get("max_tokens", 2048),
             }
-            # Add optional kwargs, excluding None values
+
+            # Forward tool-related parameters
+            if kwargs.get("tools"):
+                request_data["tools"] = kwargs["tools"]
+            if kwargs.get("tool_choice") is not None:
+                request_data["tool_choice"] = kwargs["tool_choice"]
+
+            # Add optional kwargs, excluding None values and already handled keys
+            handled_keys = ["model", "temperature", "max_tokens", "tools", "tool_choice"]
             for k, v in kwargs.items():
-                if k not in ["model", "temperature", "max_tokens"] and v is not None:
+                if k not in handled_keys and v is not None:
                     request_data[k] = v
 
             response = await client.post(
@@ -193,17 +201,31 @@ Use this context to inform your response when relevant. If the context doesn't c
     ) -> AsyncGenerator:
         """Execute streaming completion."""
         async with httpx.AsyncClient(timeout=self.settings.llm_timeout) as client:
+            # Build request data
+            request_data = {
+                "model": kwargs.get("model", self.settings.llm_model),
+                "messages": messages,
+                "temperature": kwargs.get("temperature", 0.7),
+                "max_tokens": kwargs.get("max_tokens", 2048),
+                "stream": True,
+            }
+
+            # Forward tool-related parameters
+            if kwargs.get("tools"):
+                request_data["tools"] = kwargs["tools"]
+            if kwargs.get("tool_choice") is not None:
+                request_data["tool_choice"] = kwargs["tool_choice"]
+
+            # Add other kwargs
+            handled_keys = ["model", "temperature", "max_tokens", "stream", "tools", "tool_choice"]
+            for k, v in kwargs.items():
+                if k not in handled_keys and v is not None:
+                    request_data[k] = v
+
             async with client.stream(
                 "POST",
                 f"{self.settings.llm_base_url}/chat/completions",
-                json={
-                    "model": kwargs.get("model", self.settings.llm_model),
-                    "messages": messages,
-                    "temperature": kwargs.get("temperature", 0.7),
-                    "max_tokens": kwargs.get("max_tokens", 2048),
-                    "stream": True,
-                    **{k: v for k, v in kwargs.items() if k not in ["model", "temperature", "max_tokens", "stream"]},
-                },
+                json=request_data,
             ) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():

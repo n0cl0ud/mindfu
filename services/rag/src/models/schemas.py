@@ -12,12 +12,37 @@ from pydantic import BaseModel, Field
 # =============================================================================
 
 
+class ToolCall(BaseModel):
+    """Tool call in a message."""
+
+    id: str
+    type: str = "function"
+    function: Dict[str, Any]
+
+
 class ChatMessage(BaseModel):
     """Chat message in OpenAI format."""
 
-    role: Literal["system", "user", "assistant"]
-    content: str
+    role: Literal["system", "user", "assistant", "tool"]
+    content: Optional[str] = None
     name: Optional[str] = None
+    tool_calls: Optional[List[ToolCall]] = None
+    tool_call_id: Optional[str] = None  # For tool response messages
+
+
+class ToolFunction(BaseModel):
+    """Tool function definition."""
+
+    name: str
+    description: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+
+
+class Tool(BaseModel):
+    """Tool definition."""
+
+    type: str = "function"
+    function: ToolFunction
 
 
 class ChatCompletionRequest(BaseModel):
@@ -32,6 +57,10 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: float = Field(default=0, ge=-2, le=2)
     presence_penalty: float = Field(default=0, ge=-2, le=2)
     stop: Optional[List[str]] = None
+
+    # Tool calling support
+    tools: Optional[List[Tool]] = None
+    tool_choice: Optional[Any] = None  # Can be "auto", "none", or specific tool
 
     # RAG-specific options
     use_rag: bool = Field(default=True, description="Enable RAG context retrieval")
