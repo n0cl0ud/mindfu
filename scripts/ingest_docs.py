@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+"""
+MindFu Documentation Ingestion Script
+
+Crawls a documentation site and ingests all pages into the RAG system.
+
+Usage:
+    python scripts/ingest_docs.py https://docs.dev.sync.global/ --source-name "Splice Docs"
+    python scripts/ingest_docs.py https://example.com/docs --dry-run
+"""
+import argparse
+import hashlib
+import re
+import time
+from urllib.parse import urljoin, urlparse
+
+import httpx
+from bs4 import BeautifulSoup
+
+
+def get_page_content(url: str) -> tuple[str, list[str]]:
+    """Fetch a page and extract its content and links."""
+    response = httpx.get(url, follow_redirects=True, timeout=30)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Remove script and style elements
+    for element in soup(["script", "style", "nav", "footer", "header"]):
+        element.decompose()
+
+    # Try to find the main content area (common patterns)
+    content_area = (
+        soup.find("div", class_="document") or  # Sphinx
+        soup.find("div", class_="md-content") or  # MkDocs Material
+        soup.find("article") or  # Generic
+        soup.find("main") or  # Generic
+        soup.find("div", class_="content") or  # Generic
+        soup.body
+    )
+
+    # Extract text
+    if content_area:
+        # Get the title
+        title = ""
+        h1 = content_area.find("h1")
+        if h1:
+            title = h1.get_text(strip=True)
+
+        # Get the text content
+        text = content_area.get_text(separator="\n", strip=True)
+
+        # Clean up excessive whitespace
+        text = re.sub(r'\n{3,}', '\n\n', text)
+
+        content = f"# {title}\n\n{text}" if title else text
+    else:
+        content = soup.get_text(separator="\n", strip=True)
+
+    # Extract links
+    links = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        # Skip anchors, external links, and non-html
+        if href.startswith("#") or href.startswith("mailto:"):
+            continue
+        full_url = urljoin(url, href)
+        links.append(full_url)
+
+    return content, links
+
+
+def crawl_site(base_url: str, max_pages: int = 500) -> dict[str, str]:
+    """Crawl a documentation site starting from base_url."""
+    parsed_base = urlparse(base_url)
+    base_domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
+
+    visited = set()
+    to_visit = [base_url]
+    pages = {}
+
+    print(f"Starting crawl from: {base_url}")
+    print(f"Base domain: {base_domain}")
+
+    while to_visit and len(visited) < max_pages:
+        url = to_visit.pop(0)
+
+        # Normalize URL (remove fragments)
+        url = url.split("#")[0]
+
+        # Skip if already visited
+        if url in visited:
+            continue
+
+        # Only crawl pages from the same domain
+        if not url.startswith(base_domain):
+            continue
+
+        # Skip non-documentation URLs
+        skip_patterns = [
+            "/_static/", "/_sources/", "/_images/",
+            ".pdf", ".zip", ".tar", ".gz",
+            "/search.html", "/genindex.html",
+        ]
+        if any(pattern in url for pattern in skip_patterns):
+            continue
+
+        visited.add(url)
+
+        try:
+            print(f"[{len(visited)}/{max_pages}] Crawling: {url}")
+            content, links = get_page_content(url)
+
+            # Only store pages with meaningful content
+            if len(content) > 100:
+                pages[url] = content
+
+            # Add new links to visit
+            for link in links:
+                if link not in visited and link.startswith(base_domain):
+                    to_visit.append(link)
+
+            # Be polite
+            time.sleep(0.5)
+
+        except Exception as e:
+            print(f"  Error: {e}")
+            continue
+
+    print(f"\nCrawl complete: {len(pages)} pages collected")
+    return pages
+
+
+def ingest_to_rag(
+    pages: dict[str, str],
+    rag_url: str,
+    collection: str = None,
+    source_name: str = None,
+):
+    """Upload pages to the RAG service."""
+    print(f"\nIngesting {len(pages)} pages to {rag_url}")
+
+    success = 0
+    failed = 0
+
+    with httpx.Client(timeout=60) as client:
+        for url, content in pages.items():
+            # Generate a stable ID from the URL
+            doc_id = hashlib.md5(url.encode()).hexdigest()
+
+            # Prepare metadata
+            metadata = {
+                "source": url,
+                "source_name": source_name or urlparse(url).netloc,
+                "type": "documentation",
+            }
+
+            # Upload to RAG
+            payload = {
+                "content": content,
+                "metadata": metadata,
+            }
+            if collection:
+                payload["collection"] = collection
+
+            try:
+                response = client.post(
+                    f"{rag_url}/v1/documents",
+                    json=payload,
+                )
+                response.raise_for_status()
+                success += 1
+                print(f"  [{success}] Ingested: {url[:60]}...")
+            except Exception as e:
+                failed += 1
+                print(f"  [FAILED] {url}: {e}")
+
+    print(f"\nIngestion complete: {success} success, {failed} failed")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Crawl and ingest documentation into MindFu RAG"
+    )
+    parser.add_argument(
+        "url",
+        help="Base URL of the documentation site to crawl"
+    )
+    parser.add_argument(
+        "--rag-url",
+        default="http://localhost:8080",
+        help="URL of the RAG service (default: http://localhost:8080)"
+    )
+    parser.add_argument(
+        "--collection",
+        default=None,
+        help="Qdrant collection name (default: use service default)"
+    )
+    parser.add_argument(
+        "--source-name",
+        default=None,
+        help="Human-readable source name for metadata"
+    )
+    parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=500,
+        help="Maximum number of pages to crawl (default: 500)"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Crawl only, don't ingest"
+    )
+
+    args = parser.parse_args()
+
+    # Crawl the site
+    pages = crawl_site(args.url, max_pages=args.max_pages)
+
+    if args.dry_run:
+        print("\nDry run - pages that would be ingested:")
+        for url in sorted(pages.keys()):
+            print(f"  {url}")
+        return
+
+    # Ingest to RAG
+    if pages:
+        ingest_to_rag(
+            pages=pages,
+            rag_url=args.rag_url,
+            collection=args.collection,
+            source_name=args.source_name,
+        )
+
+
+if __name__ == "__main__":
+    main()
