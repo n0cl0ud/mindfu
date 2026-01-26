@@ -72,7 +72,7 @@ def get_page_content(url: str) -> tuple[str, list[str]]:
     return content, links
 
 
-def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None) -> dict[str, str]:
+def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None, cache_file: str = None) -> dict[str, str]:
     """Crawl a documentation site starting from base_url."""
     parsed_base = urlparse(base_url)
     base_domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
@@ -83,6 +83,8 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
 
     print(f"Starting crawl from: {base_url}")
     print(f"Base domain: {base_domain}")
+
+    save_every = 100  # Save cache every N pages
 
     while to_visit and (max_pages == 0 or len(visited) < max_pages):
         url = to_visit.pop(0)
@@ -127,9 +129,18 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
             # Be polite
             time.sleep(0.5)
 
+            # Incremental cache save
+            if cache_file and len(pages) % save_every == 0:
+                save_cache(pages, cache_file)
+                print(f"  [Cache saved: {len(pages)} pages]")
+
         except Exception as e:
             print(f"  Error: {e}")
             continue
+
+    # Final save
+    if cache_file and pages:
+        save_cache(pages, cache_file)
 
     print(f"\nCrawl complete: {len(pages)} pages collected")
     return pages
@@ -255,9 +266,7 @@ def main():
             return
         pages = load_cache(args.cache)
     else:
-        pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude)
-        if args.cache:
-            save_cache(pages, args.cache)
+        pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude, cache_file=args.cache)
 
     if args.dry_run:
         print("\nDry run - pages that would be ingested:")
