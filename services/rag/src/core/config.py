@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     top_k: int = 5
 
     # Logging
-    log_conversations: bool = True
+    log_conversations: bool = False
 
     @property
     def postgres_url(self) -> str:
