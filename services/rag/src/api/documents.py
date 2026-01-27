@@ -167,88 +167,97 @@ async def upload_document(request: DocumentUploadRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _process_batch_sync(documents: List[dict]) -> dict:
+    """
+    Synchronous batch processing - runs in thread pool to not block event loop.
+    """
+    settings = get_settings()
+    rag_chain = get_rag_chain()
+
+    results = {
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "failed": 0,
+        "total_chunks": 0,
+    }
+
+    # Group by collection
+    by_collection = {}
+    for doc in documents:
+        collection = doc.get("collection") or settings.default_collection
+        if collection not in by_collection:
+            by_collection[collection] = []
+        by_collection[collection].append(doc)
+
+    for collection, docs in by_collection.items():
+        to_insert = []
+        for doc in docs:
+            content = doc.get("content", "")
+            metadata = doc.get("metadata", {})
+            chunk = doc.get("chunk", True)
+
+            content_hash = compute_content_hash(content)
+            source_url = metadata.get("source")
+
+            action = "created"
+            if source_url:
+                existing = rag_chain.find_by_source(source_url, collection)
+                if existing:
+                    existing_hash = existing[0].get("metadata", {}).get("content_hash")
+                    if existing_hash == content_hash:
+                        results["skipped"] += 1
+                        continue
+                    else:
+                        rag_chain.delete_by_source(source_url, collection)
+                        action = "updated"
+
+            meta_with_hash = {**metadata, "content_hash": content_hash}
+
+            if chunk:
+                splitter = get_text_splitter()
+                chunks = splitter.split_text(content)
+                for i, chunk_text in enumerate(chunks):
+                    to_insert.append({
+                        "content": chunk_text,
+                        "metadata": {**meta_with_hash, "chunk_index": i, "total_chunks": len(chunks)},
+                    })
+            else:
+                to_insert.append({
+                    "content": content,
+                    "metadata": meta_with_hash,
+                })
+
+            if action == "created":
+                results["created"] += 1
+            else:
+                results["updated"] += 1
+
+        # Batch insert
+        if to_insert:
+            rag_chain.add_documents(to_insert, collection)
+            results["total_chunks"] += len(to_insert)
+
+    return results
+
+
 @router.post("/documents/batch")
 async def upload_documents_batch(documents: List[DocumentUploadRequest]):
     """
     Upload multiple documents in a single batch for faster ingestion.
 
-    - Processes all documents in parallel
+    - Runs in thread pool to not block other requests
     - Uses batch embedding (much faster than individual)
     - Skips duplicates based on content hash
     """
+    import asyncio
+
     try:
-        settings = get_settings()
-        rag_chain = get_rag_chain()
+        # Convert Pydantic models to dicts for thread safety
+        docs_data = [doc.model_dump() for doc in documents]
 
-        results = {
-            "created": 0,
-            "updated": 0,
-            "skipped": 0,
-            "failed": 0,
-            "details": []
-        }
-
-        # Group by collection
-        by_collection = {}
-        for doc in documents:
-            collection = doc.collection or settings.default_collection
-            if collection not in by_collection:
-                by_collection[collection] = []
-            by_collection[collection].append(doc)
-
-        for collection, docs in by_collection.items():
-            # Check for existing documents and compute hashes
-            to_insert = []
-            for doc in docs:
-                content_hash = compute_content_hash(doc.content)
-                source_url = doc.metadata.get("source")
-
-                action = "created"
-                if source_url:
-                    existing = rag_chain.find_by_source(source_url, collection)
-                    if existing:
-                        existing_hash = existing[0].get("metadata", {}).get("content_hash")
-                        if existing_hash == content_hash:
-                            results["skipped"] += 1
-                            results["details"].append({"source": source_url, "action": "skipped"})
-                            continue
-                        else:
-                            rag_chain.delete_by_source(source_url, collection)
-                            action = "updated"
-
-                # Prepare for batch insert
-                metadata = {**doc.metadata, "content_hash": content_hash}
-
-                if doc.chunk:
-                    splitter = get_text_splitter()
-                    chunks = splitter.split_text(doc.content)
-                    for i, chunk in enumerate(chunks):
-                        to_insert.append({
-                            "content": chunk,
-                            "metadata": {**metadata, "chunk_index": i, "total_chunks": len(chunks)},
-                            "action": action,
-                            "source": source_url,
-                        })
-                else:
-                    to_insert.append({
-                        "content": doc.content,
-                        "metadata": metadata,
-                        "action": action,
-                        "source": source_url,
-                    })
-
-                if action == "created":
-                    results["created"] += 1
-                else:
-                    results["updated"] += 1
-                results["details"].append({"source": source_url, "action": action})
-
-            # Batch insert all chunks
-            if to_insert:
-                docs_to_add = [{"content": d["content"], "metadata": d["metadata"]} for d in to_insert]
-                rag_chain.add_documents(docs_to_add, collection)
-
-        results["total_chunks"] = len(to_insert) if 'to_insert' in dir() else 0
+        # Run heavy processing in thread pool
+        results = await asyncio.to_thread(_process_batch_sync, docs_data)
         return results
 
     except Exception as e:
