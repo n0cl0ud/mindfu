@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import chat, conversations, documents, health
+from .api import chat, conversations, documents, health, metrics
 from .core.config import get_settings
 
 # Configure logging
@@ -72,6 +72,7 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(conversations.router)
+app.include_router(metrics.router)
 
 
 @app.get("/")
@@ -88,6 +89,7 @@ async def root():
             "collections": "/v1/collections",
             "conversations": "/v1/conversations",
             "health": "/health",
+            "metrics": "/metrics",
         },
     }
 
