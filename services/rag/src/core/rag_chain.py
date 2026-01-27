@@ -100,7 +100,7 @@ class RAGChain:
 
 Use this context to inform your response when relevant. If the context doesn't contain relevant information, respond based on your general knowledge.
 
-IMPORTANT: When multiple versions of documentation are present in the context (e.g., 3.5, 3.4, 3.3), always prefer information from the most recent version (3.5 > 3.4 > 3.3 > 2.x) unless the user specifically asks about an older version."""
+IMPORTANT: When multiple versions of documentation are present in the context, always prefer information from the most recent version unless the user specifically asks about an older version."""
 
         # Find or create system message
         augmented = []
