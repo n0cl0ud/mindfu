@@ -174,55 +174,59 @@ def ingest_to_rag(
     rag_url: str,
     collection: str = None,
     source_name: str = None,
+    batch_size: int = 50,
 ):
-    """Upload pages to the RAG service."""
-    print(f"\nIngesting {len(pages)} pages to {rag_url}")
+    """Upload pages to the RAG service in batches."""
+    print(f"\nIngesting {len(pages)} pages to {rag_url} (batch size: {batch_size})")
 
     success = 0
     updated = 0
     skipped = 0
     failed = 0
 
-    with httpx.Client(timeout=60) as client:
-        for url, content in pages.items():
-            # Generate a stable ID from the URL
-            doc_id = hashlib.md5(url.encode()).hexdigest()
+    # Convert to list for batching
+    items = list(pages.items())
 
-            # Prepare metadata
-            metadata = {
-                "source": url,
-                "source_name": source_name or urlparse(url).netloc,
-                "type": "documentation",
-            }
+    with httpx.Client(timeout=300) as client:  # Longer timeout for batches
+        for i in range(0, len(items), batch_size):
+            batch = items[i:i + batch_size]
+            batch_num = i // batch_size + 1
+            total_batches = (len(items) + batch_size - 1) // batch_size
 
-            # Upload to RAG
-            payload = {
-                "content": content,
-                "metadata": metadata,
-            }
-            if collection:
-                payload["collection"] = collection
+            # Prepare batch payload
+            documents = []
+            for url, content in batch:
+                metadata = {
+                    "source": url,
+                    "source_name": source_name or urlparse(url).netloc,
+                    "type": "documentation",
+                }
+                doc = {
+                    "content": content,
+                    "metadata": metadata,
+                    "chunk": True,
+                }
+                if collection:
+                    doc["collection"] = collection
+                documents.append(doc)
 
             try:
+                print(f"  [Batch {batch_num}/{total_batches}] Sending {len(documents)} documents...")
                 response = client.post(
-                    f"{rag_url}/v1/documents",
-                    json=payload,
+                    f"{rag_url}/v1/documents/batch",
+                    json=documents,
                 )
                 response.raise_for_status()
                 result = response.json()
-                action = result.get("action", "created")
-                if action == "skipped":
-                    skipped += 1
-                    print(f"  [SKIP] {url[:70]}...")
-                elif action == "updated":
-                    updated += 1
-                    print(f"  [UPDATE] {url[:70]}...")
-                else:
-                    success += 1
-                    print(f"  [NEW] {url[:70]}...")
+
+                success += result.get("created", 0)
+                updated += result.get("updated", 0)
+                skipped += result.get("skipped", 0)
+
+                print(f"  [Batch {batch_num}/{total_batches}] Done: {result.get('created', 0)} new, {result.get('updated', 0)} updated, {result.get('skipped', 0)} skipped")
             except Exception as e:
-                failed += 1
-                print(f"  [FAILED] {url}: {e}")
+                failed += len(batch)
+                print(f"  [Batch {batch_num}/{total_batches}] FAILED: {e}")
 
     print(f"\nIngestion complete: {success} new, {updated} updated, {skipped} skipped, {failed} failed")
 
@@ -288,6 +292,12 @@ def main():
         action="store_true",
         help="Resume crawl from cache file (skips already crawled URLs)"
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=50,
+        help="Number of documents per batch for ingestion (default: 50)"
+    )
 
     args = parser.parse_args()
 
@@ -313,6 +323,7 @@ def main():
             rag_url=args.rag_url,
             collection=args.collection,
             source_name=args.source_name,
+            batch_size=args.batch_size,
         )
 
 
