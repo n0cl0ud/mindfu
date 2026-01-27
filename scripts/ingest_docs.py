@@ -72,7 +72,7 @@ def get_page_content(url: str) -> tuple[str, list[str]]:
     return content, links
 
 
-def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None, cache_file: str = None, delay: float = 0.3) -> dict[str, str]:
+def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = None, cache_file: str = None, delay: float = 0.3, resume: bool = False) -> dict[str, str]:
     """Crawl a documentation site starting from base_url."""
     parsed_base = urlparse(base_url)
     base_domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
@@ -80,6 +80,15 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
     visited = set()
     to_visit = [base_url]
     pages = {}
+
+    # Resume from cache if requested
+    if resume and cache_file and Path(cache_file).exists():
+        pages = json.loads(Path(cache_file).read_text())
+        visited = set(pages.keys())
+        print(f"Resuming crawl: loaded {len(pages)} pages from cache")
+        # Re-add links from cached pages to find new ones
+        for url, content in pages.items():
+            to_visit.append(url)
 
     print(f"Starting crawl from: {base_url}")
     print(f"Base domain: {base_domain}")
@@ -274,6 +283,11 @@ def main():
         default=0.3,
         help="Delay between requests in seconds (default: 0.3, use 0 for no delay)"
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume crawl from cache file (skips already crawled URLs)"
+    )
 
     args = parser.parse_args()
 
@@ -284,7 +298,7 @@ def main():
             return
         pages = load_cache(args.cache)
     else:
-        pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude, cache_file=args.cache, delay=args.delay)
+        pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude, cache_file=args.cache, delay=args.delay, resume=args.resume)
 
     if args.dry_run:
         print("\nDry run - pages that would be ingested:")
