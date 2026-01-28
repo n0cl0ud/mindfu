@@ -48,13 +48,25 @@ DEFAULT_CODE_EXTENSIONS = [
 ]
 
 
-def read_local_files(directory: str, extensions: list[str] = None, include_code: bool = False) -> dict[str, str]:
+def read_local_files(directory: str, extensions: list[str] = None, include_code: bool = False, exclude_patterns: list[str] = None) -> dict[str, str]:
     """Read all documentation files from a local directory."""
     if extensions is None:
         if include_code:
             extensions = DEFAULT_DOC_EXTENSIONS + DEFAULT_CODE_EXTENSIONS
         else:
             extensions = DEFAULT_DOC_EXTENSIONS
+
+    if exclude_patterns is None:
+        exclude_patterns = []
+
+    # Default excludes for code ingestion
+    default_excludes = [
+        "/test/", "/tests/", "/__test__/", "/__tests__/",
+        "/node_modules/", "/target/", "/build/", "/dist/",
+        "/.git/", "/__pycache__/", "/.pytest_cache/",
+        "/vendor/", "/.gradle/", "/.sbt/",
+    ]
+    exclude_patterns = exclude_patterns + default_excludes
 
     dir_path = Path(directory)
     if not dir_path.exists():
@@ -65,6 +77,11 @@ def read_local_files(directory: str, extensions: list[str] = None, include_code:
         for file_path in dir_path.rglob(f"*{ext}"):
             # Skip hidden files and directories
             if any(part.startswith(".") for part in file_path.parts):
+                continue
+
+            # Skip excluded patterns
+            path_str = str(file_path).replace("\\", "/")
+            if any(pattern in path_str for pattern in exclude_patterns):
                 continue
 
             try:
@@ -84,7 +101,7 @@ def read_local_files(directory: str, extensions: list[str] = None, include_code:
     return pages
 
 
-def clone_git_repo(repo_url: str, git_path: str = None, branch: str = None, include_code: bool = False) -> tuple[str, dict[str, str]]:
+def clone_git_repo(repo_url: str, git_path: str = None, branch: str = None, include_code: bool = False, exclude_patterns: list[str] = None) -> tuple[str, dict[str, str]]:
     """Clone a git repo (sparse if git_path specified) and read docs."""
     # Create temp directory
     tmp_dir = tempfile.mkdtemp(prefix="mindfu-git-")
@@ -114,7 +131,7 @@ def clone_git_repo(repo_url: str, git_path: str = None, branch: str = None, incl
             docs_dir = Path(tmp_dir)
 
         print(f"Reading files from {docs_dir}...")
-        pages = read_local_files(str(docs_dir), include_code=include_code)
+        pages = read_local_files(str(docs_dir), include_code=include_code, exclude_patterns=exclude_patterns)
 
         # Update source keys to include repo URL
         repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
@@ -496,7 +513,7 @@ def main():
 
     elif args.from_dir:
         print(f"Reading local directory: {args.from_dir}")
-        pages = read_local_files(args.from_dir, include_code=args.include_code)
+        pages = read_local_files(args.from_dir, include_code=args.include_code, exclude_patterns=args.exclude)
 
     elif args.from_git:
         print(f"Cloning git repository: {args.from_git}")
@@ -505,6 +522,7 @@ def main():
             git_path=args.git_path,
             branch=args.git_branch,
             include_code=args.include_code,
+            exclude_patterns=args.exclude,
         )
 
     elif args.url:
