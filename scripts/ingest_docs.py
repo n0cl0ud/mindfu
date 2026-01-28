@@ -29,10 +29,32 @@ import httpx
 from bs4 import BeautifulSoup
 
 
-def read_local_files(directory: str, extensions: list[str] = None) -> dict[str, str]:
+DEFAULT_DOC_EXTENSIONS = [".md", ".mdx", ".rst", ".txt"]
+DEFAULT_CODE_EXTENSIONS = [
+    # JVM
+    ".java", ".scala", ".kt", ".kts", ".groovy",
+    # Web
+    ".js", ".ts", ".jsx", ".tsx", ".vue", ".svelte",
+    # Python
+    ".py", ".pyi",
+    # Systems
+    ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".cc",
+    # Config/Data
+    ".yaml", ".yml", ".json", ".toml",
+    # Shell
+    ".sh", ".bash",
+    # Other
+    ".rb", ".php", ".swift", ".cs", ".fs",
+]
+
+
+def read_local_files(directory: str, extensions: list[str] = None, include_code: bool = False) -> dict[str, str]:
     """Read all documentation files from a local directory."""
     if extensions is None:
-        extensions = [".md", ".mdx", ".rst", ".txt"]
+        if include_code:
+            extensions = DEFAULT_DOC_EXTENSIONS + DEFAULT_CODE_EXTENSIONS
+        else:
+            extensions = DEFAULT_DOC_EXTENSIONS
 
     dir_path = Path(directory)
     if not dir_path.exists():
@@ -62,7 +84,7 @@ def read_local_files(directory: str, extensions: list[str] = None) -> dict[str, 
     return pages
 
 
-def clone_git_repo(repo_url: str, git_path: str = None, branch: str = None) -> tuple[str, dict[str, str]]:
+def clone_git_repo(repo_url: str, git_path: str = None, branch: str = None, include_code: bool = False) -> tuple[str, dict[str, str]]:
     """Clone a git repo (sparse if git_path specified) and read docs."""
     # Create temp directory
     tmp_dir = tempfile.mkdtemp(prefix="mindfu-git-")
@@ -92,7 +114,7 @@ def clone_git_repo(repo_url: str, git_path: str = None, branch: str = None) -> t
             docs_dir = Path(tmp_dir)
 
         print(f"Reading files from {docs_dir}...")
-        pages = read_local_files(str(docs_dir))
+        pages = read_local_files(str(docs_dir), include_code=include_code)
 
         # Update source keys to include repo URL
         repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
@@ -397,6 +419,11 @@ def main():
         help="Git branch to clone (default: main)"
     )
     parser.add_argument(
+        "--include-code",
+        action="store_true",
+        help="Include source code files (.java, .scala, .py, .ts, .go, .rs, etc.)"
+    )
+    parser.add_argument(
         "--rag-url",
         default="http://localhost:8080",
         help="URL of the RAG service (default: http://localhost:8080)"
@@ -469,7 +496,7 @@ def main():
 
     elif args.from_dir:
         print(f"Reading local directory: {args.from_dir}")
-        pages = read_local_files(args.from_dir)
+        pages = read_local_files(args.from_dir, include_code=args.include_code)
 
     elif args.from_git:
         print(f"Cloning git repository: {args.from_git}")
@@ -477,6 +504,7 @@ def main():
             args.from_git,
             git_path=args.git_path,
             branch=args.git_branch,
+            include_code=args.include_code,
         )
 
     elif args.url:
