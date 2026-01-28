@@ -25,6 +25,51 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["chat"])
 
 
+async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
+    """
+    Convert a non-streaming response to SSE format.
+    Used when we force non-streaming due to vLLM tool call bugs but client expects streaming.
+    """
+    # Convert non-streaming response to streaming chunk format
+    if result.get("choices"):
+        choice = result["choices"][0]
+        message = choice.get("message", {})
+
+        # Convert tool_calls to streaming format (add index field)
+        tool_calls = message.get("tool_calls")
+        if tool_calls:
+            tool_calls = [
+                {"index": i, **tc} for i, tc in enumerate(tool_calls)
+            ]
+
+        # Create a streaming chunk that looks like a complete response
+        chunk = {
+            "id": result.get("id", f"chatcmpl-{uuid.uuid4().hex[:8]}"),
+            "object": "chat.completion.chunk",
+            "created": result.get("created", int(datetime.now().timestamp())),
+            "model": result.get("model", ""),
+            "choices": [{
+                "index": 0,
+                "delta": {
+                    "role": "assistant",
+                    "content": message.get("content"),
+                    "tool_calls": tool_calls,
+                },
+                "finish_reason": choice.get("finish_reason"),
+            }],
+        }
+
+        # Remove None values from delta
+        chunk["choices"][0]["delta"] = {
+            k: v for k, v in chunk["choices"][0]["delta"].items() if v is not None
+        }
+
+        yield f"data: {json.dumps(chunk)}\n\n"
+
+    # Send the [DONE] marker
+    yield "data: [DONE]\n\n"
+
+
 async def log_conversation_async(
     model: str,
     messages: list,
@@ -76,14 +121,21 @@ async def chat_completions(request: ChatCompletionRequest):
         # Convert messages to dict format (exclude None values for llama.cpp compatibility)
         messages = [msg.model_dump(exclude_none=True) for msg in request.messages]
 
-        if request.stream:
+        # WORKAROUND: Disable streaming when tools are present
+        # vLLM's Mistral tool parser has a bug with streaming tool calls
+        # See: https://github.com/vllm-project/vllm/issues/17585
+        force_no_stream = bool(request.tools)
+        if force_no_stream and request.stream:
+            logger.info("Forcing non-streaming mode due to tool calls (vLLM bug workaround)")
+
+        if request.stream and not force_no_stream:
             return StreamingResponse(
                 stream_response(rag_chain, messages, request),
                 media_type="text/event-stream",
                 headers={"X-Accel-Buffering": "no"},
             )
 
-        # Non-streaming response
+        # Non-streaming response (or forced non-streaming for tool calls)
         result = await rag_chain.query(
             messages=messages,
             collection=request.collection,
@@ -123,6 +175,14 @@ async def chat_completions(request: ChatCompletionRequest):
                 rag_context=result.get("_rag_context"),
             )
         )
+
+        # If client wanted streaming but we forced non-streaming, wrap response in SSE format
+        if force_no_stream and request.stream:
+            return StreamingResponse(
+                fake_stream_response(result),
+                media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no"},
+            )
 
         # Return raw LLM response with RAG context (preserves all vLLM fields)
         return result

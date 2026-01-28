@@ -164,7 +164,7 @@ services:
       - REDIS_PORT=6379
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
-      - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-true}
+      - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
     volumes:
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations
@@ -258,7 +258,7 @@ services:
       - REDIS_PORT=6379
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
-      - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-true}
+      - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
     volumes:
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations

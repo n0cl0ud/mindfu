@@ -105,8 +105,14 @@ async def fetch_vllm_metrics() -> Optional[str]:
     """Fetch metrics from vLLM."""
     settings = get_settings()
     try:
+        # vLLM exposes metrics at /metrics (not /v1/metrics)
+        # Strip /v1 suffix from base URL if present
+        base_url = settings.llm_base_url.rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3]
+
         async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{settings.llm_base_url}/metrics")
+            response = await client.get(f"{base_url}/metrics")
             if response.status_code == 200:
                 return response.text
     except Exception as e:
