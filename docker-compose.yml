@@ -34,6 +34,7 @@ services:
       - "6334:6334"
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__MAX_REQUEST_SIZE_MB=100
     networks:
       - mindfu-network
     restart: unless-stopped
