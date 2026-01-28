@@ -68,9 +68,21 @@ QDRANT_VECTORS = Gauge(
     ["collection"]
 )
 
+QDRANT_INDEXED_VECTORS = Gauge(
+    "qdrant_indexed_vectors_total",
+    "Total indexed vectors in Qdrant",
+    ["collection"]
+)
+
 QDRANT_POINTS = Gauge(
     "qdrant_points_total",
     "Total points in Qdrant",
+    ["collection"]
+)
+
+QDRANT_SEGMENTS = Gauge(
+    "qdrant_segments_total",
+    "Total segments in Qdrant collection",
     ["collection"]
 )
 
@@ -78,6 +90,35 @@ QDRANT_STATUS = Gauge(
     "qdrant_collection_status",
     "Collection status (1=green, 0=other)",
     ["collection"]
+)
+
+QDRANT_OPTIMIZER_STATUS = Gauge(
+    "qdrant_optimizer_status",
+    "Optimizer status (1=ok, 0=other)",
+    ["collection"]
+)
+
+# =============================================================================
+# Redis Metrics
+# =============================================================================
+
+REDIS_CONNECTED = Gauge(
+    "redis_connected",
+    "Redis connection status (1=connected, 0=disconnected)"
+)
+
+# =============================================================================
+# PostgreSQL Metrics
+# =============================================================================
+
+POSTGRES_CONNECTED = Gauge(
+    "postgres_connected",
+    "PostgreSQL connection status (1=connected, 0=disconnected)"
+)
+
+POSTGRES_CONVERSATIONS = Gauge(
+    "postgres_conversations_total",
+    "Total conversations in database"
 )
 
 
@@ -93,12 +134,56 @@ def update_qdrant_metrics():
             try:
                 info = rag_chain.qdrant.get_collection(col.name)
                 QDRANT_VECTORS.labels(collection=col.name).set(info.vectors_count or 0)
+                QDRANT_INDEXED_VECTORS.labels(collection=col.name).set(info.indexed_vectors_count or 0)
                 QDRANT_POINTS.labels(collection=col.name).set(info.points_count or 0)
+                QDRANT_SEGMENTS.labels(collection=col.name).set(info.segments_count or 0)
                 QDRANT_STATUS.labels(collection=col.name).set(1 if info.status.value == "green" else 0)
+                QDRANT_OPTIMIZER_STATUS.labels(collection=col.name).set(
+                    1 if info.optimizer_status.value == "ok" else 0
+                )
             except Exception as e:
                 logger.warning(f"Failed to get stats for collection {col.name}: {e}")
     except Exception as e:
         logger.warning(f"Failed to update Qdrant metrics: {e}")
+
+
+def update_redis_metrics():
+    """Update Redis metrics."""
+    try:
+        import redis
+        settings = get_settings()
+        r = redis.Redis(host=settings.redis_host, port=settings.redis_port, socket_timeout=2)
+        r.ping()
+        REDIS_CONNECTED.set(1)
+    except Exception as e:
+        logger.warning(f"Failed to connect to Redis: {e}")
+        REDIS_CONNECTED.set(0)
+
+
+def update_postgres_metrics():
+    """Update PostgreSQL metrics."""
+    try:
+        import psycopg2
+        settings = get_settings()
+        conn = psycopg2.connect(
+            host=settings.postgres_host,
+            port=settings.postgres_port,
+            user=settings.postgres_user,
+            password=settings.postgres_password,
+            dbname=settings.postgres_db,
+            connect_timeout=2,
+        )
+        POSTGRES_CONNECTED.set(1)
+
+        # Get conversation count
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM conversations")
+            count = cur.fetchone()[0]
+            POSTGRES_CONVERSATIONS.set(count)
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Failed to connect to PostgreSQL: {e}")
+        POSTGRES_CONNECTED.set(0)
 
 
 async def fetch_vllm_metrics() -> Optional[str]:
@@ -128,10 +213,14 @@ async def metrics():
     Includes:
     - RAG service metrics
     - Qdrant metrics
+    - Redis metrics
+    - PostgreSQL metrics
     - vLLM metrics (forwarded)
     """
-    # Update Qdrant metrics
+    # Update all metrics
     update_qdrant_metrics()
+    update_redis_metrics()
+    update_postgres_metrics()
 
     # Generate RAG metrics
     rag_metrics = generate_latest(REGISTRY).decode("utf-8")
