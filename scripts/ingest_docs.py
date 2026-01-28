@@ -2,22 +2,121 @@
 """
 MindFu Documentation Ingestion Script
 
-Crawls a documentation site and ingests all pages into the RAG system.
+Crawls a documentation site or ingests local files into the RAG system.
 
 Usage:
+    # Web crawl
     python scripts/ingest_docs.py https://docs.dev.sync.global/ --source-name "Splice Docs"
-    python scripts/ingest_docs.py https://example.com/docs --dry-run
+
+    # Local directory (markdown files)
+    python scripts/ingest_docs.py --from-dir ./docs --source-name "My Docs"
+
+    # Git repo
+    python scripts/ingest_docs.py --from-git https://github.com/org/repo --git-path docs --source-name "Repo Docs"
 """
 import argparse
 import hashlib
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+
+
+def read_local_files(directory: str, extensions: list[str] = None) -> dict[str, str]:
+    """Read all documentation files from a local directory."""
+    if extensions is None:
+        extensions = [".md", ".mdx", ".rst", ".txt"]
+
+    dir_path = Path(directory)
+    if not dir_path.exists():
+        raise ValueError(f"Directory not found: {directory}")
+
+    pages = {}
+    for ext in extensions:
+        for file_path in dir_path.rglob(f"*{ext}"):
+            # Skip hidden files and directories
+            if any(part.startswith(".") for part in file_path.parts):
+                continue
+
+            try:
+                content = file_path.read_text(encoding="utf-8")
+                # Use relative path as the "URL"
+                rel_path = file_path.relative_to(dir_path)
+                source_key = f"file://{rel_path}"
+
+                # Only store files with meaningful content
+                if len(content.strip()) > 50:
+                    pages[source_key] = content
+                    print(f"  Read: {rel_path}")
+            except Exception as e:
+                print(f"  Error reading {file_path}: {e}")
+
+    print(f"\nLoaded {len(pages)} files from {directory}")
+    return pages
+
+
+def clone_git_repo(repo_url: str, git_path: str = None, branch: str = None) -> tuple[str, dict[str, str]]:
+    """Clone a git repo (sparse if git_path specified) and read docs."""
+    # Create temp directory
+    tmp_dir = tempfile.mkdtemp(prefix="mindfu-git-")
+
+    try:
+        print(f"Cloning {repo_url}...")
+
+        if git_path:
+            # Sparse checkout - only get the specified path
+            subprocess.run(
+                ["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse", repo_url, tmp_dir],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "-C", tmp_dir, "sparse-checkout", "set", git_path],
+                check=True,
+                capture_output=True,
+            )
+            docs_dir = Path(tmp_dir) / git_path
+        else:
+            # Full clone (shallow)
+            cmd = ["git", "clone", "--depth", "1", repo_url, tmp_dir]
+            if branch:
+                cmd.extend(["--branch", branch])
+            subprocess.run(cmd, check=True, capture_output=True)
+            docs_dir = Path(tmp_dir)
+
+        print(f"Reading files from {docs_dir}...")
+        pages = read_local_files(str(docs_dir))
+
+        # Update source keys to include repo URL
+        repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
+        updated_pages = {}
+        for key, content in pages.items():
+            # Replace file:// with github URL
+            rel_path = key.replace("file://", "")
+            if "github.com" in repo_url:
+                # Convert to GitHub raw URL format
+                github_base = repo_url.replace(".git", "").rstrip("/")
+                branch_name = branch or "main"
+                if git_path:
+                    new_key = f"{github_base}/blob/{branch_name}/{git_path}/{rel_path}"
+                else:
+                    new_key = f"{github_base}/blob/{branch_name}/{rel_path}"
+            else:
+                new_key = f"{repo_url}:{rel_path}"
+            updated_pages[new_key] = content
+
+        return tmp_dir, updated_pages
+
+    except subprocess.CalledProcessError as e:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise RuntimeError(f"Git clone failed: {e.stderr.decode() if e.stderr else str(e)}")
 
 
 def get_page_content(url: str) -> tuple[str, list[str]]:
@@ -273,7 +372,29 @@ def main():
     )
     parser.add_argument(
         "url",
+        nargs="?",
+        default=None,
         help="Base URL of the documentation site to crawl"
+    )
+    parser.add_argument(
+        "--from-dir",
+        default=None,
+        help="Ingest from local directory instead of crawling"
+    )
+    parser.add_argument(
+        "--from-git",
+        default=None,
+        help="Clone and ingest from git repository URL"
+    )
+    parser.add_argument(
+        "--git-path",
+        default=None,
+        help="Subdirectory in git repo to ingest (sparse checkout)"
+    )
+    parser.add_argument(
+        "--git-branch",
+        default=None,
+        help="Git branch to clone (default: main)"
     )
     parser.add_argument(
         "--rag-url",
@@ -337,14 +458,34 @@ def main():
 
     args = parser.parse_args()
 
-    # Load from cache or crawl
+    tmp_dir = None  # For git cleanup
+
+    # Determine ingestion mode
     if args.from_cache:
         if not args.cache:
             print("Error: --from-cache requires --cache <file>")
             return
         pages = load_cache(args.cache)
-    else:
+
+    elif args.from_dir:
+        print(f"Reading local directory: {args.from_dir}")
+        pages = read_local_files(args.from_dir)
+
+    elif args.from_git:
+        print(f"Cloning git repository: {args.from_git}")
+        tmp_dir, pages = clone_git_repo(
+            args.from_git,
+            git_path=args.git_path,
+            branch=args.git_branch,
+        )
+
+    elif args.url:
         pages = crawl_site(args.url, max_pages=args.max_pages, exclude_patterns=args.exclude, cache_file=args.cache, delay=args.delay, resume=args.resume)
+
+    else:
+        print("Error: Must provide URL, --from-dir, --from-git, or --from-cache")
+        parser.print_help()
+        return
 
     if args.dry_run:
         print("\nDry run - pages that would be ingested:")
@@ -361,6 +502,11 @@ def main():
             source_name=args.source_name,
             batch_size=args.batch_size,
         )
+
+    # Cleanup temp directory if used
+    if tmp_dir:
+        print(f"\nCleaning up temp directory: {tmp_dir}")
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
