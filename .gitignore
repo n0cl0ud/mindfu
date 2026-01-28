@@ -36,6 +36,7 @@ data/models/
 data/conversations/*.json
 data/documents/*
 !data/documents/.gitkeep
+data/crawl-cache/
 backups/
 
 # IDE

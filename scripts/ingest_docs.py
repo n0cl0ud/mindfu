@@ -80,15 +80,36 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
     visited = set()
     to_visit = [base_url]
     pages = {}
+    cached_links = {}  # Store links separately for resume
 
     # Resume from cache if requested
     if resume and cache_file and Path(cache_file).exists():
-        pages = json.loads(Path(cache_file).read_text())
+        raw_cache = json.loads(Path(cache_file).read_text())
+
+        # Handle both old format (str) and new format (dict with content/links)
+        for url, data in raw_cache.items():
+            if isinstance(data, dict):
+                # New format: {"content": "...", "links": [...]}
+                pages[url] = data.get("content", "")
+                cached_links[url] = data.get("links", [])
+            else:
+                # Old format: just content string
+                pages[url] = data
+                cached_links[url] = []
+
         visited = set(pages.keys())
         print(f"Resuming crawl: loaded {len(pages)} pages from cache")
-        # Re-add links from cached pages to find new ones
-        for url, content in pages.items():
-            to_visit.append(url)
+
+        # Extract unvisited links from cached pages
+        unvisited_links = set()
+        for url, links in cached_links.items():
+            for link in links:
+                link = link.split("#")[0]  # Remove fragments
+                if link not in visited and link.startswith(base_domain):
+                    unvisited_links.add(link)
+
+        to_visit = list(unvisited_links)
+        print(f"Found {len(to_visit)} unvisited links from cached pages")
 
     print(f"Starting crawl from: {base_url}")
     print(f"Base domain: {base_domain}")
@@ -129,6 +150,7 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
             # Only store pages with meaningful content
             if len(content) > 100:
                 pages[url] = content
+                cached_links[url] = links  # Store links for resume
 
             # Add new links to visit
             for link in links:
@@ -141,7 +163,7 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
 
             # Incremental cache save
             if cache_file and len(pages) % save_every == 0:
-                save_cache(pages, cache_file)
+                save_cache(pages, cached_links, cache_file)
                 print(f"  [Cache saved: {len(pages)} pages]")
 
         except Exception as e:
@@ -150,21 +172,35 @@ def crawl_site(base_url: str, max_pages: int = 0, exclude_patterns: list[str] = 
 
     # Final save
     if cache_file and pages:
-        save_cache(pages, cache_file)
+        save_cache(pages, cached_links, cache_file)
 
     print(f"\nCrawl complete: {len(pages)} pages collected")
     return pages
 
 
-def save_cache(pages: dict[str, str], cache_file: str):
-    """Save crawled pages to cache file."""
-    Path(cache_file).write_text(json.dumps(pages, indent=2, ensure_ascii=False))
+def save_cache(pages: dict[str, str], cached_links: dict[str, list], cache_file: str):
+    """Save crawled pages to cache file (new format with links)."""
+    cache_data = {}
+    for url, content in pages.items():
+        cache_data[url] = {
+            "content": content,
+            "links": cached_links.get(url, [])
+        }
+    Path(cache_file).write_text(json.dumps(cache_data, indent=2, ensure_ascii=False))
     print(f"Saved {len(pages)} pages to {cache_file}")
 
 
 def load_cache(cache_file: str) -> dict[str, str]:
-    """Load crawled pages from cache file."""
-    pages = json.loads(Path(cache_file).read_text())
+    """Load crawled pages from cache file (handles both old and new format)."""
+    raw_cache = json.loads(Path(cache_file).read_text())
+    pages = {}
+    for url, data in raw_cache.items():
+        if isinstance(data, dict):
+            # New format
+            pages[url] = data.get("content", "")
+        else:
+            # Old format
+            pages[url] = data
     print(f"Loaded {len(pages)} pages from {cache_file}")
     return pages
 
