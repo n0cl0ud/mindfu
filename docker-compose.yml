@@ -366,6 +366,8 @@ services:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
       - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
+      # Nemotron uses qwen3_coder parser which supports streaming tool calls
+      - FORCE_NO_STREAM_WITH_TOOLS=false
     volumes:
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations

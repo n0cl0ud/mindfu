@@ -124,7 +124,9 @@ async def chat_completions(request: ChatCompletionRequest):
         # WORKAROUND: Disable streaming when tools are present
         # vLLM's Mistral tool parser has a bug with streaming tool calls
         # See: https://github.com/vllm-project/vllm/issues/17585
-        force_no_stream = bool(request.tools)
+        # Can be disabled via FORCE_NO_STREAM_WITH_TOOLS=false for models with working streaming (e.g., Nemotron)
+        settings = get_settings()
+        force_no_stream = bool(request.tools) and settings.force_no_stream_with_tools
         if force_no_stream and request.stream:
             logger.info("Forcing non-streaming mode due to tool calls (vLLM bug workaround)")
 
