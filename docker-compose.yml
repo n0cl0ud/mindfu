@@ -216,7 +216,7 @@ services:
       ${VLLM_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
       --host 0.0.0.0
       --port 8000
-      --served-model-name devstral
+      --served-model-name devstral-small-2
       --dtype auto
       --max-model-len ${VLLM_MAX_MODEL_LEN:-81920}
       --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
