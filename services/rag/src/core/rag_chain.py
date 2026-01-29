@@ -204,12 +204,17 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
         """Execute streaming completion."""
         async with httpx.AsyncClient(timeout=self.settings.llm_timeout) as client:
             # Build request data
+            # Always include usage in streaming responses for client compatibility
+            stream_options = kwargs.get("stream_options") or {}
+            stream_options["include_usage"] = True
+
             request_data = {
                 "model": kwargs.get("model", self.settings.llm_model),
                 "messages": messages,
                 "temperature": kwargs.get("temperature", 0.7),
                 "max_tokens": kwargs.get("max_tokens", 2048),
                 "stream": True,
+                "stream_options": stream_options,
             }
 
             # Forward tool-related parameters
@@ -219,7 +224,7 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
                 request_data["tool_choice"] = kwargs["tool_choice"]
 
             # Add other kwargs
-            handled_keys = ["model", "temperature", "max_tokens", "stream", "tools", "tool_choice"]
+            handled_keys = ["model", "temperature", "max_tokens", "stream", "stream_options", "tools", "tool_choice"]
             for k, v in kwargs.items():
                 if k not in handled_keys and v is not None:
                     request_data[k] = v
