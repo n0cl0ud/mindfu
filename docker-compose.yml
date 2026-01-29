@@ -207,7 +207,11 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN:-}
+      - HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
       - VLLM_ATTENTION_BACKEND=${VLLM_ATTENTION_BACKEND:-FLASHINFER}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - model-cache:/root/.cache/huggingface
     ports:
