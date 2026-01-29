@@ -6,8 +6,11 @@
 #   GGUF/llama.cpp (RTX 5080, consumer GPUs):
 #     docker compose --profile gguf up -d
 #
-#   vLLM (L40S, A100, H100 - datacenter GPUs):
+#   vLLM Devstral (L40S, A100, H100 - datacenter GPUs):
 #     docker compose --profile vllm up -d
+#
+#   vLLM Nemotron 3 Nano (L40S, A100, H100 - 1M context):
+#     docker compose --profile nemotron up -d
 #
 #   Training (L40S/A100/H100):
 #     docker compose --profile vllm --profile training up -d
@@ -280,6 +283,100 @@ services:
       retries: 3
     profiles:
       - vllm
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # NEMOTRON STACK (profile: nemotron) - Nemotron 3 Nano with 1M context
+  # =============================================================================
+
+  # ---------------------------------------------------------------------------
+  # LLM Inference - vLLM with Nemotron 3 Nano (30B params, 3B active MoE)
+  # ---------------------------------------------------------------------------
+  llm-nemotron:
+    image: vllm/vllm-openai:${VLLM_VERSION:-v0.14.1}
+    container_name: mindfu-llm-nemotron
+    ipc: host
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_TOKEN=${HF_TOKEN:-}
+      - VLLM_ATTENTION_BACKEND=${VLLM_ATTENTION_BACKEND:-FLASHINFER}
+    volumes:
+      - model-cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    command: >
+      ${NEMOTRON_MODEL:-nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16}
+      --host 0.0.0.0
+      --port 8000
+      --max-model-len ${NEMOTRON_MAX_MODEL_LEN:-262144}
+      --max-num-seqs ${NEMOTRON_MAX_SEQS:-8}
+      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
+      --enable-auto-tool-choice
+      --tool-call-parser qwen3_coder
+      --enable-prefix-caching
+      --tensor-parallel-size ${VLLM_TP_SIZE:-1}
+      --trust-remote-code
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 900s  # 15 min - Nemotron needs time to load
+    profiles:
+      - nemotron
+    networks:
+      - mindfu-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # RAG Service for Nemotron backend
+  # ---------------------------------------------------------------------------
+  rag-nemotron:
+    image: ghcr.io/n0cl0ud/mindfu-rag:latest
+    container_name: mindfu-rag-nemotron
+    environment:
+      - LLM_BASE_URL=http://llm-nemotron:8000/v1
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-mindfu}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mindfu_secret}
+      - POSTGRES_DB=${POSTGRES_DB:-mindfu}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
+      - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
+    volumes:
+      - ./data/documents:/app/documents
+      - ./data/conversations:/app/conversations
+      - embedding-cache:/root/.cache/huggingface
+    ports:
+      - "11434:8080"
+    depends_on:
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      llm-nemotron:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - nemotron
     networks:
       - mindfu-network
     restart: unless-stopped
