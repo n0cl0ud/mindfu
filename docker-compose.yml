@@ -216,6 +216,8 @@ services:
       ${VLLM_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
       --host 0.0.0.0
       --port 8000
+      --served-model-name devstral
+      --dtype auto
       --max-model-len ${VLLM_MAX_MODEL_LEN:-81920}
       --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
       --kv-cache-dtype ${VLLM_KV_CACHE_DTYPE:-fp8}
@@ -223,6 +225,7 @@ services:
       --enable-auto-tool-choice
       --enable-prefix-caching
       --enable-chunked-prefill
+      --async-scheduling
       --tensor-parallel-size ${VLLM_TP_SIZE:-1}
     deploy:
       resources:
@@ -302,6 +305,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN:-}
       - VLLM_ATTENTION_BACKEND=${VLLM_ATTENTION_BACKEND:-FLASHINFER}
+      # FlashInfer MoE optimizations
+      - VLLM_USE_FLASHINFER_MOE_FP8=1
+      - VLLM_FLASHINFER_MOE_BACKEND=throughput
     volumes:
       - model-cache:/root/.cache/huggingface
     ports:
@@ -310,12 +316,17 @@ services:
       ${NEMOTRON_MODEL:-nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16}
       --host 0.0.0.0
       --port 8000
+      --served-model-name nemotron
+      --dtype auto
       --max-model-len ${NEMOTRON_MAX_MODEL_LEN:-262144}
       --max-num-seqs ${NEMOTRON_MAX_SEQS:-8}
       --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
+      --kv-cache-dtype fp8
       --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
       --enable-prefix-caching
+      --enable-chunked-prefill
+      --async-scheduling
       --tensor-parallel-size ${VLLM_TP_SIZE:-1}
       --trust-remote-code
     deploy:
