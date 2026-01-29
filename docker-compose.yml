@@ -201,7 +201,7 @@ services:
   # LLM Inference - vLLM (full precision with FP8 KV cache)
   # ---------------------------------------------------------------------------
   llm-vllm:
-    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
+    image: vllm/vllm-openai:${VLLM_VERSION:-v0.14.1-cu130}
     container_name: mindfu-llm-vllm
     ipc: host
     environment:
@@ -297,7 +297,7 @@ services:
   # LLM Inference - vLLM with Nemotron 3 Nano (30B params, 3B active MoE)
   # ---------------------------------------------------------------------------
   llm-nemotron:
-    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
+    image: vllm/vllm-openai:${VLLM_VERSION:-v0.14.1-cu130}
     container_name: mindfu-llm-nemotron
     ipc: host
     environment:
