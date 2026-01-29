@@ -214,7 +214,6 @@ services:
       - 1.1.1.1
     volumes:
       - model-cache:/root/.cache/huggingface
-      - ./configs/vllm/tool_chat_template_mistral_parallel.jinja:/app/tool_chat_template_mistral_parallel.jinja:ro
       # PATCH: Dynamic format detection for Devstral tool calling
       - ./configs/vllm/mistral_tool_parser_patched.py:/usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py:ro
     ports:
@@ -227,9 +226,7 @@ services:
       --max-model-len ${VLLM_MAX_MODEL_LEN:-81920}
       --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
       --kv-cache-dtype ${VLLM_KV_CACHE_DTYPE:-fp8}
-      --tokenizer-mode auto
       --tool-call-parser mistral
-      --chat-template /app/tool_chat_template_mistral_parallel.jinja
       --enable-auto-tool-choice
       --enable-prefix-caching
       --enable-chunked-prefill
