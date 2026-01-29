@@ -201,7 +201,7 @@ services:
   # LLM Inference - vLLM (full precision with FP8 KV cache)
   # ---------------------------------------------------------------------------
   llm-vllm:
-    image: vllm/vllm-openai:${VLLM_VERSION:-latest}
+    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
     container_name: mindfu-llm-vllm
     ipc: host
     environment:
@@ -297,7 +297,7 @@ services:
   # LLM Inference - vLLM with Nemotron 3 Nano (30B params, 3B active MoE)
   # ---------------------------------------------------------------------------
   llm-nemotron:
-    image: vllm/vllm-openai:${VLLM_VERSION:-v0.14.1}
+    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
     container_name: mindfu-llm-nemotron
     ipc: host
     environment:
@@ -309,6 +309,7 @@ services:
       - VLLM_FLASHINFER_MOE_BACKEND=throughput
     volumes:
       - model-cache:/root/.cache/huggingface
+      - ./configs/vllm/nano_v3_reasoning_parser.py:/app/nano_v3_reasoning_parser.py:ro
     ports:
       - "8000:8000"
     command: >
@@ -322,6 +323,8 @@ services:
       --kv-cache-dtype fp8
       --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
+      --reasoning-parser-plugin /app/nano_v3_reasoning_parser.py
+      --reasoning-parser nano_v3
       --enable-prefix-caching
       --enable-chunked-prefill
       --async-scheduling
