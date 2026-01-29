@@ -224,8 +224,9 @@ services:
       --max-model-len ${VLLM_MAX_MODEL_LEN:-81920}
       --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
       --kv-cache-dtype ${VLLM_KV_CACHE_DTYPE:-fp8}
-      --tool-call-parser hermes
-      --enable-auto-tool-choice
+      # Tool calling disabled - vLLM parsers buggy with Mistral tokenizer
+      # --tool-call-parser mistral
+      # --enable-auto-tool-choice
       --enable-prefix-caching
       --enable-chunked-prefill
       --async-scheduling
