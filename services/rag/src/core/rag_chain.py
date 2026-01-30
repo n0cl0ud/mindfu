@@ -161,8 +161,9 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
         """Execute non-streaming completion."""
         async with httpx.AsyncClient(timeout=self.settings.llm_timeout) as client:
             # Build request, excluding None values for llama.cpp compatibility
+            # Always use configured model - clients may send short names that vLLM doesn't recognize
             request_data = {
-                "model": kwargs.get("model", self.settings.llm_model),
+                "model": self.settings.llm_model,
                 "messages": messages,
                 "temperature": kwargs.get("temperature", 0.7),
                 "max_tokens": kwargs.get("max_tokens", 2048),
@@ -208,8 +209,9 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
             stream_options = kwargs.get("stream_options") or {}
             stream_options["include_usage"] = True
 
+            # Always use configured model - clients may send short names that vLLM doesn't recognize
             request_data = {
-                "model": kwargs.get("model", self.settings.llm_model),
+                "model": self.settings.llm_model,
                 "messages": messages,
                 "temperature": kwargs.get("temperature", 0.7),
                 "max_tokens": kwargs.get("max_tokens", 2048),
