@@ -56,8 +56,18 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
         streaming_tool_calls = [{"index": i, **tc} for i, tc in enumerate(tool_calls)]
         yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': streaming_tool_calls}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
-    # Chunk 4: finish_reason
-    yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {}, 'logprobs': None, 'finish_reason': choice.get('finish_reason', 'stop')}]})}\n\n"
+    # Chunk 4: finish_reason + usage (combined as expected by Vibe/Mistral clients)
+    final_chunk = {
+        'id': chunk_id,
+        'object': 'chat.completion.chunk',
+        'created': created,
+        'model': model,
+        'choices': [{'index': 0, 'delta': {'content': ''}, 'logprobs': None, 'finish_reason': choice.get('finish_reason', 'stop')}]
+    }
+    usage = result.get("usage")
+    if usage:
+        final_chunk['usage'] = usage
+    yield f"data: {json.dumps(final_chunk)}\n\n"
 
     # Send the [DONE] marker
     yield "data: [DONE]\n\n"
