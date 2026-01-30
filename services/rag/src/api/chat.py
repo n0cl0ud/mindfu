@@ -29,43 +29,35 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     """
     Convert a non-streaming response to SSE format.
     Used when we force non-streaming due to vLLM tool call bugs but client expects streaming.
+    Mimics real streaming by sending role, content, and finish_reason in separate chunks.
     """
-    # Convert non-streaming response to streaming chunk format
-    if result.get("choices"):
-        choice = result["choices"][0]
-        message = choice.get("message", {})
+    if not result.get("choices"):
+        yield "data: [DONE]\n\n"
+        return
 
-        # Convert tool_calls to streaming format (add index field)
-        tool_calls = message.get("tool_calls")
-        if tool_calls:
-            tool_calls = [
-                {"index": i, **tc} for i, tc in enumerate(tool_calls)
-            ]
+    choice = result["choices"][0]
+    message = choice.get("message", {})
+    chunk_id = result.get("id", f"chatcmpl-{uuid.uuid4().hex[:8]}")
+    created = result.get("created", int(datetime.now().timestamp()))
+    model = result.get("model", "")
 
-        # Create a streaming chunk that looks like a complete response
-        chunk = {
-            "id": result.get("id", f"chatcmpl-{uuid.uuid4().hex[:8]}"),
-            "object": "chat.completion.chunk",
-            "created": result.get("created", int(datetime.now().timestamp())),
-            "model": result.get("model", ""),
-            "choices": [{
-                "index": 0,
-                "delta": {
-                    "role": "assistant",
-                    "content": message.get("content"),
-                    "tool_calls": tool_calls,
-                },
-                "finish_reason": choice.get("finish_reason"),
-            }],
-        }
+    # Chunk 1: role
+    yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': ''}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
-        # Remove None values and empty lists from delta
-        chunk["choices"][0]["delta"] = {
-            k: v for k, v in chunk["choices"][0]["delta"].items()
-            if v is not None and v != []
-        }
+    # Chunk 2: content (if any)
+    content = message.get("content")
+    if content:
+        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': content}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
-        yield f"data: {json.dumps(chunk)}\n\n"
+    # Chunk 3: tool_calls (if any)
+    tool_calls = message.get("tool_calls")
+    if tool_calls:
+        # Convert to streaming format with index
+        streaming_tool_calls = [{"index": i, **tc} for i, tc in enumerate(tool_calls)]
+        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': streaming_tool_calls}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+
+    # Chunk 4: finish_reason
+    yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {}, 'logprobs': None, 'finish_reason': choice.get('finish_reason', 'stop')}]})}\n\n"
 
     # Send the [DONE] marker
     yield "data: [DONE]\n\n"
