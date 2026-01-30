@@ -59,9 +59,10 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
             }],
         }
 
-        # Remove None values from delta
+        # Remove None values and empty lists from delta
         chunk["choices"][0]["delta"] = {
-            k: v for k, v in chunk["choices"][0]["delta"].items() if v is not None
+            k: v for k, v in chunk["choices"][0]["delta"].items()
+            if v is not None and v != []
         }
 
         yield f"data: {json.dumps(chunk)}\n\n"
