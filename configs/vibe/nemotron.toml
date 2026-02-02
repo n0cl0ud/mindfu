@@ -1,0 +1,148 @@
+# =============================================================================
+# MindFu - Vibe CLI Configuration for Nemotron 3 Nano
+# =============================================================================
+# Copy to ~/.vibe/config.toml or ~/.config/vibe/config.toml
+#
+# Usage:
+#   cp configs/vibe/nemotron.toml ~/.vibe/config.toml
+#   vibe
+# =============================================================================
+
+active_model = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
+vim_keybindings = false
+disable_welcome_banner_animation = false
+displayed_workdir = ""
+auto_compact_threshold = 75000
+context_warnings = false
+textual_theme = "textual-dark"
+instructions = ""
+system_prompt_id = "cli"
+include_commit_signature = true
+include_model_info = true
+include_project_context = true
+include_prompt_detail = true
+enable_update_checks = true
+api_timeout = 720.0
+tool_paths = []
+mcp_servers = []
+enabled_tools = []
+disabled_tools = []
+
+# =============================================================================
+# Provider - MindFu RAG endpoint
+# =============================================================================
+[[providers]]
+name = "mindfu"
+api_base = "http://localhost:11434/v1"  # Change to your server IP
+api_key_env_var = ""
+api_style = "openai"
+backend = "generic"
+
+# =============================================================================
+# Model - Nemotron 3 Nano 30B (FP8)
+# =============================================================================
+[[models]]
+name = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
+model = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
+provider = "mindfu"
+context_length = 65536      # Match --max-model-len on server
+max_tokens = 32768
+temperature = 0.15
+top_p = 0.95
+
+# =============================================================================
+# Project Context
+# =============================================================================
+[project_context]
+max_chars = 20000
+default_commit_count = 5
+max_doc_bytes = 32768
+truncation_buffer = 2000
+max_depth = 4
+max_files = 500
+max_dirs_per_level = 15
+timeout_seconds = 3.0
+
+# =============================================================================
+# Session Logging
+# =============================================================================
+[session_logging]
+save_dir = "~/.vibe/logs/session"
+session_prefix = "session"
+enabled = true
+
+# =============================================================================
+# Tool Permissions - Optimized for Nemotron (good tool calling support)
+# =============================================================================
+[tools.search_replace]
+permission = "ask"
+allowlist = []
+denylist = []
+max_content_size = 200000
+create_backup = false
+fuzzy_threshold = 0.85
+
+[tools.bash]
+permission = "ask"
+allowlist = [
+    "echo", "find", "tree", "whoami", "cat", "file", "head", "ls", "pwd",
+    "stat", "tail", "uname", "wc", "which", "grep", "awk", "sed",
+    # Git
+    "git diff", "git log", "git status", "git show", "git branch",
+    "git add", "git commit", "git push", "git pull", "git checkout",
+    "git stash", "git merge", "git rebase", "git tag", "git remote",
+    # Dev tools
+    "cargo", "npm", "yarn", "pnpm", "pip", "poetry", "make", "cmake",
+    "docker", "docker-compose", "kubectl", "helm",
+    "curl", "wget", "jq", "yq",
+    # Python/Node
+    "python -c", "python3 -c", "node -e",
+]
+denylist = [
+    "gdb", "pdb", "passwd", "nano", "vim", "vi", "emacs",
+    "bash -i", "sh -i", "zsh -i", "fish -i", "dash -i",
+    "screen", "tmux", "rm -rf /", "sudo rm", "less", "more", "most", "man"
+]
+denylist_standalone = [
+    "python", "python3", "ipython", "bash", "sh", "nohup",
+    "vi", "vim", "emacs", "nano", "su", "less", "more", "most"
+]
+max_output_bytes = 32000
+default_timeout = 60
+
+[tools.grep]
+permission = "always"
+allowlist = []
+denylist = []
+max_output_bytes = 100000
+default_max_matches = 200
+default_timeout = 90
+exclude_patterns = [".venv/", "venv/", ".env/", "env/", "node_modules/", ".git/", "__pycache__/"]
+
+[tools.glob]
+permission = "always"
+allowlist = []
+denylist = []
+max_results = 1000
+default_timeout = 30
+
+[tools.read_file]
+permission = "always"
+allowlist = []
+denylist = []
+max_size = 200000
+
+[tools.write_file]
+permission = "ask"
+allowlist = []
+denylist = []
+create_parent_dirs = true
+
+# =============================================================================
+# Inference - Streaming enabled (Nemotron handles it well)
+# =============================================================================
+[inference]
+stream = true
+temperature = 0.15
+top_p = 0.95
+max_tokens = 32768
