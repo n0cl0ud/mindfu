@@ -1,0 +1,45 @@
+# =============================================================================
+# MindFu - Vibe Agent Profile for Nemotron 3 Nano (YOLO Mode)
+# =============================================================================
+# Copy to ~/.vibe/agents/nemotron-yolo.toml
+#
+# WARNING: Auto-approves ALL tool executions - use with caution!
+#
+# Usage:
+#   vibe --agent nemotron-yolo
+# =============================================================================
+
+display_name = "Nemotron YOLO"
+description = "Nemotron avec auto-approve - ATTENTION: exécute tout sans demander"
+safety = "yolo"
+
+# Override active model
+active_model = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
+
+# Auto-approve all tools
+auto_approve = true
+
+# =============================================================================
+# Tool Permissions - Maximum freedom
+# =============================================================================
+[tools.bash]
+permission = "always"
+allowlist = [
+    "echo", "find", "tree", "whoami", "cat", "file", "head", "ls", "pwd",
+    "stat", "tail", "uname", "wc", "which", "grep", "awk", "sed",
+    "git",
+    "cargo", "npm", "yarn", "pnpm", "pip", "poetry", "make", "cmake",
+    "docker", "docker-compose", "kubectl", "helm",
+    "curl", "wget", "jq", "yq",
+    "python -c", "python3 -c", "node -e",
+    "mv", "cp", "mkdir", "touch", "chmod",
+]
+denylist = [
+    "rm -rf /", "sudo rm -rf", ":(){ :|:& };:",  # Fork bomb protection
+]
+
+[tools.write_file]
+permission = "always"
+
+[tools.search_replace]
+permission = "always"

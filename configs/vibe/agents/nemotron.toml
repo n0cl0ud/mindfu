@@ -1,0 +1,46 @@
+# =============================================================================
+# MindFu - Vibe Agent Profile for Nemotron 3 Nano
+# =============================================================================
+# Copy to ~/.vibe/agents/nemotron.toml
+#
+# Usage:
+#   vibe --agent nemotron
+#   # or switch in session: /agent nemotron
+# =============================================================================
+
+display_name = "Nemotron"
+description = "Agent optimisé pour Nemotron 3 Nano - streaming tool calls natif"
+safety = "neutral"
+
+# Override active model
+active_model = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
+
+# =============================================================================
+# Tool Permissions - Expanded for Nemotron (reliable tool calling)
+# =============================================================================
+[tools.bash]
+permission = "ask"
+allowlist = [
+    # Basic commands
+    "echo", "find", "tree", "whoami", "cat", "file", "head", "ls", "pwd",
+    "stat", "tail", "uname", "wc", "which", "grep", "awk", "sed",
+    # Git (full access)
+    "git",
+    # Dev tools
+    "cargo", "npm", "yarn", "pnpm", "pip", "poetry", "make", "cmake",
+    "docker", "docker-compose", "kubectl", "helm",
+    "curl", "wget", "jq", "yq",
+    # Python/Node one-liners
+    "python -c", "python3 -c", "node -e",
+]
+denylist = [
+    "gdb", "pdb", "passwd", "nano", "vim", "vi", "emacs",
+    "bash -i", "sh -i", "zsh -i", "fish -i", "dash -i",
+    "screen", "tmux", "rm -rf /", "sudo rm", "less", "more", "most", "man"
+]
+
+[tools.write_file]
+permission = "ask"
+
+[tools.search_replace]
+permission = "ask"
