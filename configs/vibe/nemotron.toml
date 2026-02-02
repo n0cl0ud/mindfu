@@ -138,11 +138,3 @@ allowlist = []
 denylist = []
 create_parent_dirs = true
 
-# =============================================================================
-# Inference - Streaming enabled (Nemotron handles it well)
-# =============================================================================
-[inference]
-stream = true
-temperature = 0.15
-top_p = 0.95
-max_tokens = 32768

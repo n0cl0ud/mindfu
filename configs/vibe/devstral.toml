@@ -129,11 +129,3 @@ allowlist = []
 denylist = []
 create_parent_dirs = true
 
-# =============================================================================
-# Inference - Streaming DISABLED (Devstral has issues with streaming + tools)
-# =============================================================================
-[inference]
-stream = false
-temperature = 0.15
-top_p = 0.95
-max_tokens = 16384
