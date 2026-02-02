@@ -304,39 +304,28 @@ services:
   # LLM Inference - vLLM with Nemotron 3 Nano (30B params, 3B active MoE)
   # ---------------------------------------------------------------------------
   llm-nemotron:
-    image: vllm/vllm-openai:${VLLM_VERSION:-v0.14.1-cu130}
+    image: vllm/vllm-openai:v0.14.1-cu130
     container_name: mindfu-llm-nemotron
     ipc: host
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN:-}
-      - VLLM_ATTENTION_BACKEND=${VLLM_ATTENTION_BACKEND:-FLASHINFER}
-      # FlashInfer MoE optimizations
-      - VLLM_USE_FLASHINFER_MOE_FP8=1
-      - VLLM_FLASHINFER_MOE_BACKEND=throughput
     volumes:
       - model-cache:/root/.cache/huggingface
-      - ./configs/vllm/nano_v3_reasoning_parser.py:/app/nano_v3_reasoning_parser.py:ro
     ports:
       - "8000:8000"
     command: >
-      ${NEMOTRON_MODEL:-nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8}
+      nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
       --host 0.0.0.0
       --port 8000
-      --dtype auto
-      --max-model-len ${NEMOTRON_MAX_MODEL_LEN:-262144}
-      --max-num-seqs ${NEMOTRON_MAX_SEQS:-8}
-      --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
+      --max-model-len 65536
+      --max-num-seqs 3
+      --gpu-memory-utilization 0.90
+      --trust-remote-code
       --kv-cache-dtype fp8
       --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
-      --reasoning-parser-plugin /app/nano_v3_reasoning_parser.py
-      --reasoning-parser nano_v3
-      --enable-prefix-caching
-      --enable-chunked-prefill
-      --async-scheduling
-      --tensor-parallel-size ${VLLM_TP_SIZE:-1}
-      --trust-remote-code
+      --reasoning-parser deepseek_r1
     deploy:
       resources:
         reservations:
@@ -364,6 +353,7 @@ services:
     container_name: mindfu-rag-nemotron
     environment:
       - LLM_BASE_URL=http://llm-nemotron:8000/v1
+      - LLM_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
       - POSTGRES_HOST=postgres
