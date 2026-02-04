@@ -217,10 +217,13 @@ services:
       - model-cache:/root/.cache/huggingface
       # PATCH: Dynamic format detection for Devstral tool calling (v0.14 only)
       - ./configs/vllm/mistral_tool_parser_patched.py:/usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py:ro
+      # PATCH: Fix JSONDecodeError on malformed tool call arguments
+      - ./configs/vllm/entrypoint-patch.sh:/entrypoint-patch.sh:ro
     ports:
       - "8000:8000"
+    entrypoint: ["/bin/bash", "/entrypoint-patch.sh"]
     command: >
-      ${VLLM_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
+      --model ${VLLM_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
       --host 0.0.0.0
       --port 8000
       --dtype auto
@@ -314,10 +317,13 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       - model-cache:/root/.cache/huggingface
+      # PATCH: Fix JSONDecodeError on malformed tool call arguments
+      - ./configs/vllm/entrypoint-patch.sh:/entrypoint-patch.sh:ro
     ports:
       - "8000:8000"
+    entrypoint: ["/bin/bash", "/entrypoint-patch.sh"]
     command: >
-      nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
+      --model nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
       --host 0.0.0.0
       --port 8000
       --max-model-len 65536
