@@ -215,8 +215,6 @@ services:
       - 1.1.1.1
     volumes:
       - model-cache:/root/.cache/huggingface
-      # PATCH: Dynamic format detection for Devstral tool calling (v0.14 only)
-      - ./configs/vllm/mistral_tool_parser_patched.py:/usr/local/lib/python3.12/dist-packages/vllm/tool_parsers/mistral_tool_parser.py:ro
       # PATCH: Fix JSONDecodeError on malformed tool call arguments
       - ./configs/vllm/entrypoint-patch.sh:/entrypoint-patch.sh:ro
     ports:
