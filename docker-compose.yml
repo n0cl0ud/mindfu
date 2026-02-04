@@ -201,11 +201,12 @@ services:
   # LLM Inference - vLLM (full precision with FP8 KV cache)
   # ---------------------------------------------------------------------------
   llm-vllm:
-    image: vllm/vllm-openai:${VLLM_VERSION:-v0.14.1-cu130}
+    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
     container_name: mindfu-llm-vllm
     ipc: host
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/local/cuda/lib64
       - HF_TOKEN=${HF_TOKEN:-}
       - HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-0}
       - VLLM_ATTENTION_BACKEND=${VLLM_ATTENTION_BACKEND:-FLASHINFER}
@@ -304,11 +305,12 @@ services:
   # LLM Inference - vLLM with Nemotron 3 Nano (30B params, 3B active MoE)
   # ---------------------------------------------------------------------------
   llm-nemotron:
-    image: vllm/vllm-openai:v0.14.1-cu130
+    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
     container_name: mindfu-llm-nemotron
     ipc: host
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/local/cuda/lib64
       - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       - model-cache:/root/.cache/huggingface
