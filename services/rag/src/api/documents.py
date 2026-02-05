@@ -14,6 +14,7 @@ from qdrant_client.models import Distance, VectorParams
 from ..core.config import get_settings
 from ..core.embeddings import get_embedding_service
 from ..core.rag_chain import get_rag_chain
+from .metrics import record_document_ingested
 from ..models.schemas import (
     CollectionCreateRequest,
     CollectionInfo,
@@ -107,6 +108,7 @@ async def upload_document(request: DocumentUploadRequest):
                 existing_hash = existing[0].get("metadata", {}).get("content_hash")
                 if existing_hash == content_hash:
                     # Same content, skip
+                    record_document_ingested("skipped")
                     return {
                         "action": "skipped",
                         "reason": "content unchanged",
@@ -154,6 +156,7 @@ async def upload_document(request: DocumentUploadRequest):
             doc_ids = [doc_id]
             chunks = [request.content]
 
+        record_document_ingested(action)
         return {
             "action": action,
             "document_ids": doc_ids,

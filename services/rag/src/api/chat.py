@@ -4,6 +4,7 @@ MindFu Chat API - OpenAI-Compatible Endpoints
 import asyncio
 import json
 import logging
+import time
 import uuid
 from datetime import datetime
 from typing import AsyncGenerator
@@ -13,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from ..core.config import get_settings
 from ..core.rag_chain import get_rag_chain
+from .metrics import record_request, record_context_chunks
 from ..models.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -118,6 +120,8 @@ async def chat_completions(request: ChatCompletionRequest):
     - LangChain
     - Any OpenAI-compatible client
     """
+    start_time = time.time()
+    status = "success"
     try:
         rag_chain = get_rag_chain()
 
@@ -181,8 +185,14 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         )
 
+        # Record RAG context chunks if used
+        rag_context = result.get("_rag_context")
+        if rag_context and rag_context.get("contexts_used"):
+            record_context_chunks(rag_context["contexts_used"])
+
         # If client wanted streaming but we forced non-streaming, wrap response in SSE format
         if force_no_stream and request.stream:
+            record_request("chat/completions", status, time.time() - start_time)
             return StreamingResponse(
                 fake_stream_response(result),
                 media_type="text/event-stream",
@@ -190,10 +200,12 @@ async def chat_completions(request: ChatCompletionRequest):
             )
 
         # Return raw LLM response with RAG context (preserves all vLLM fields)
+        record_request("chat/completions", status, time.time() - start_time)
         return result
 
     except Exception as e:
         logger.exception("Chat completion error")
+        record_request("chat/completions", "error", time.time() - start_time)
         raise HTTPException(status_code=500, detail=str(e))
 
 
