@@ -275,7 +275,7 @@ services:
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
       - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
       # Streaming with tools broken in vLLM Mistral parser (IndexError in streamed_args_for_tool)
-      - FORCE_NO_STREAM_WITH_TOOLS=true
+      - FORCE_NO_STREAM_WITH_TOOLS=false
     volumes:
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations
