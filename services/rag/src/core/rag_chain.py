@@ -181,12 +181,30 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
                 if k not in handled_keys and v is not None:
                     request_data[k] = v
 
+            # DEBUG: Log request data for tool calls
+            if kwargs.get("tools"):
+                import json
+                logger.info(f"DEBUG Tool call request to vLLM:")
+                logger.info(f"  Model: {request_data.get('model')}")
+                logger.info(f"  Messages count: {len(request_data.get('messages', []))}")
+                logger.info(f"  Tools count: {len(request_data.get('tools', []))}")
+                logger.info(f"  Full request: {json.dumps(request_data, default=str)[:2000]}")
+
             response = await client.post(
                 f"{self.settings.llm_base_url}/chat/completions",
                 json=request_data,
             )
             response.raise_for_status()
             result = response.json()
+
+            # DEBUG: Log response for tool calls
+            if kwargs.get("tools") and result.get("choices"):
+                choice = result["choices"][0]
+                msg = choice.get("message", {})
+                if msg.get("tool_calls"):
+                    import json
+                    logger.info(f"DEBUG Tool call response from vLLM:")
+                    logger.info(f"  Tool calls: {json.dumps(msg.get('tool_calls'), default=str)[:1000]}")
 
             # Add context metadata
             result["_rag_context"] = {
