@@ -29,7 +29,7 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     """
     Convert a non-streaming response to SSE format.
     Used when we force non-streaming due to vLLM tool call bugs but client expects streaming.
-    Mimics real streaming by sending role, content, and finish_reason in separate chunks.
+    Streams tool_calls in OpenAI-compatible incremental format.
     """
     if not result.get("choices"):
         yield "data: [DONE]\n\n"
@@ -40,31 +40,49 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     chunk_id = result.get("id", f"chatcmpl-{uuid.uuid4().hex[:8]}")
     created = result.get("created", int(datetime.now().timestamp()))
     model = result.get("model", "")
+    usage = result.get("usage")
 
     # Chunk 1: role
-    yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'role': 'assistant', 'content': ''}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+    yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
     # Chunk 2: content (if any)
     content = message.get("content")
     if content:
         yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': content}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
-    # Chunk 3: tool_calls (if any)
+    # Stream tool_calls in OpenAI incremental format
     tool_calls = message.get("tool_calls")
     if tool_calls:
-        # Convert to streaming format with index
-        streaming_tool_calls = [{"index": i, **tc} for i, tc in enumerate(tool_calls)]
-        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': streaming_tool_calls}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+        for i, tc in enumerate(tool_calls):
+            # First chunk for this tool: id, type, function name, empty arguments
+            first_tc_chunk = {
+                "index": i,
+                "id": tc.get("id", ""),
+                "type": tc.get("type", "function"),
+                "function": {
+                    "name": tc.get("function", {}).get("name", ""),
+                    "arguments": ""
+                }
+            }
+            yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': [first_tc_chunk]}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
-    # Chunk 4: finish_reason + usage (combined as expected by Vibe/Mistral clients)
+            # Second chunk: the arguments
+            args = tc.get("function", {}).get("arguments", "")
+            if args:
+                args_chunk = {
+                    "index": i,
+                    "function": {"arguments": args}
+                }
+                yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': [args_chunk]}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+
+    # Final chunk: finish_reason + usage
     final_chunk = {
         'id': chunk_id,
         'object': 'chat.completion.chunk',
         'created': created,
         'model': model,
-        'choices': [{'index': 0, 'delta': {'content': ''}, 'logprobs': None, 'finish_reason': choice.get('finish_reason', 'stop')}]
+        'choices': [{'index': 0, 'delta': {}, 'logprobs': None, 'finish_reason': choice.get('finish_reason', 'stop')}]
     }
-    usage = result.get("usage")
     if usage:
         final_chunk['usage'] = usage
     yield f"data: {json.dumps(final_chunk)}\n\n"
@@ -196,12 +214,13 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         )
 
-        # If client wanted streaming but we forced non-streaming, return non-streaming response
-        # NOTE: fake_stream_response was causing issues with Vibe parsing tool_calls
-        # Vibe should handle non-streaming responses fine
+        # If client wanted streaming but we forced non-streaming, wrap response in SSE format
         if force_no_stream and request.stream:
-            # Return as non-streaming JSON response instead of fake SSE
-            return result
+            return StreamingResponse(
+                fake_stream_response(result),
+                media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no"},
+            )
 
         # Return raw LLM response with RAG context (preserves all vLLM fields)
         return result
