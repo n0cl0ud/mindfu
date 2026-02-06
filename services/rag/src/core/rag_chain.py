@@ -221,6 +221,8 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
         **kwargs,
     ) -> AsyncGenerator:
         """Execute streaming completion."""
+        import json
+
         async with httpx.AsyncClient(timeout=self.settings.llm_timeout) as client:
             # Build request data
             # Always include usage in streaming responses for client compatibility
@@ -238,7 +240,8 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
             }
 
             # Forward tool-related parameters
-            if kwargs.get("tools"):
+            has_tools = bool(kwargs.get("tools"))
+            if has_tools:
                 request_data["tools"] = kwargs["tools"]
             if kwargs.get("tool_choice") is not None:
                 request_data["tool_choice"] = kwargs["tool_choice"]
@@ -255,9 +258,108 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
                 json=request_data,
             ) as response:
                 response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        yield line + "\n\n"
+
+                if not has_tools:
+                    # No tools - stream directly
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            yield line + "\n\n"
+                else:
+                    # Buffer chunks and reconstruct tool_calls for Vibe compatibility
+                    # Vibe can't accumulate incremental tool_call arguments
+                    chunks = []
+                    tool_calls = {}  # index -> {id, type, function: {name, arguments}}
+                    role = None
+                    content_parts = []
+                    finish_reason = None
+                    usage = None
+                    chunk_id = None
+                    created = None
+                    model = None
+
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        data = line[6:]  # Remove "data: " prefix
+                        if data == "[DONE]":
+                            continue
+
+                        try:
+                            chunk = json.loads(data)
+                            chunk_id = chunk.get("id", chunk_id)
+                            created = chunk.get("created", created)
+                            model = chunk.get("model", model)
+
+                            if chunk.get("usage"):
+                                usage = chunk["usage"]
+
+                            choices = chunk.get("choices", [])
+                            if choices:
+                                choice = choices[0]
+                                if choice.get("finish_reason"):
+                                    finish_reason = choice["finish_reason"]
+
+                                delta = choice.get("delta", {})
+                                if delta.get("role"):
+                                    role = delta["role"]
+                                if delta.get("content"):
+                                    content_parts.append(delta["content"])
+
+                                # Accumulate tool_calls
+                                for tc in delta.get("tool_calls", []):
+                                    idx = tc.get("index", 0)
+                                    if idx not in tool_calls:
+                                        tool_calls[idx] = {
+                                            "id": tc.get("id", ""),
+                                            "type": tc.get("type", "function"),
+                                            "function": {"name": "", "arguments": ""}
+                                        }
+                                    if tc.get("id"):
+                                        tool_calls[idx]["id"] = tc["id"]
+                                    if tc.get("type"):
+                                        tool_calls[idx]["type"] = tc["type"]
+                                    func = tc.get("function", {})
+                                    if func.get("name"):
+                                        tool_calls[idx]["function"]["name"] = func["name"]
+                                    if func.get("arguments"):
+                                        tool_calls[idx]["function"]["arguments"] += func["arguments"]
+                        except json.JSONDecodeError:
+                            continue
+
+                    # Now emit reconstructed chunks
+                    # Chunk 1: role + content + complete tool_calls
+                    first_delta = {"role": role or "assistant"}
+                    if content_parts:
+                        first_delta["content"] = "".join(content_parts)
+                    if tool_calls:
+                        # Convert dict to sorted list
+                        tc_list = [tool_calls[i] for i in sorted(tool_calls.keys())]
+                        first_delta["tool_calls"] = [
+                            {"index": i, **tc} for i, tc in enumerate(tc_list)
+                        ]
+                        logger.info(f"Reconstructed tool_calls: {json.dumps(tc_list)[:500]}")
+
+                    first_chunk = {
+                        "id": chunk_id,
+                        "object": "chat.completion.chunk",
+                        "created": created,
+                        "model": model,
+                        "choices": [{"index": 0, "delta": first_delta, "logprobs": None, "finish_reason": None}]
+                    }
+                    yield f"data: {json.dumps(first_chunk)}\n\n"
+
+                    # Final chunk: finish_reason + usage
+                    final_chunk = {
+                        "id": chunk_id,
+                        "object": "chat.completion.chunk",
+                        "created": created,
+                        "model": model,
+                        "choices": [{"index": 0, "delta": {}, "logprobs": None, "finish_reason": finish_reason or "stop"}]
+                    }
+                    if usage:
+                        final_chunk["usage"] = usage
+                    yield f"data: {json.dumps(final_chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
 
     def add_document(
         self,
