@@ -276,8 +276,9 @@ services:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
       - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
-      # Streaming with tools - using vLLM nightly with fixes
-      - FORCE_NO_STREAM_WITH_TOOLS=false
+      # Streaming with tools - DISABLED due to vLLM Mistral parser bugs
+      # See: https://github.com/vllm-project/vllm/issues/17585
+      - FORCE_NO_STREAM_WITH_TOOLS=true
     volumes:
       # Mount source code for hot-reload (no rebuild needed)
       - ./services/rag/src:/app/src:ro
