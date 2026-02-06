@@ -42,18 +42,14 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     model = result.get("model", "")
     usage = result.get("usage")
 
-    # Chunk 1: role
-    yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
-
-    # Chunk 2: content (if any)
     content = message.get("content")
-    if content:
-        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': content}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
-
-    # Stream tool_calls - send complete tool_call in single chunk
-    # (incremental streaming was causing Vibe to not accumulate arguments properly)
     tool_calls = message.get("tool_calls")
+
+    # Build first delta with role (and tool_calls if present - must be together for Vibe)
+    first_delta = {"role": "assistant"}
+
     if tool_calls:
+        # Send role + complete tool_calls in same chunk (Vibe expects them together)
         streaming_tool_calls = []
         for i, tc in enumerate(tool_calls):
             args = tc.get("function", {}).get("arguments", "")
@@ -67,10 +63,17 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
                     "arguments": args
                 }
             })
-        chunk_data = {'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': streaming_tool_calls}, 'logprobs': None, 'finish_reason': None}]}
+        first_delta["tool_calls"] = streaming_tool_calls
+        chunk_data = {'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]}
         chunk_str = json.dumps(chunk_data)
-        logger.info(f"DEBUG fake_stream yielding tool_calls chunk: {chunk_str[:500]}")
+        logger.info(f"DEBUG fake_stream yielding role+tool_calls chunk: {chunk_str[:500]}")
         yield f"data: {chunk_str}\n\n"
+    else:
+        # No tool calls - send role, then content
+        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+
+        if content:
+            yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': content}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
     # Final chunk: finish_reason + usage
     final_chunk = {
