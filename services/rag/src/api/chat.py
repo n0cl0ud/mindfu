@@ -4,7 +4,6 @@ MindFu Chat API - OpenAI-Compatible Endpoints
 import asyncio
 import json
 import logging
-import time
 import uuid
 from datetime import datetime
 from typing import AsyncGenerator
@@ -14,7 +13,6 @@ from fastapi.responses import StreamingResponse
 
 from ..core.config import get_settings
 from ..core.rag_chain import get_rag_chain
-from .metrics import record_request, record_context_chunks
 from ..models.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -120,18 +118,11 @@ async def chat_completions(request: ChatCompletionRequest):
     - LangChain
     - Any OpenAI-compatible client
     """
-    start_time = time.time()
-    status = "success"
     try:
         rag_chain = get_rag_chain()
 
-        # Convert messages to dict format
-        # For tool calls: preserve all fields (including null content) for vLLM compatibility
-        # For non-tool calls: exclude None values for llama.cpp compatibility
-        if request.tools:
-            messages = [msg.model_dump() for msg in request.messages]
-        else:
-            messages = [msg.model_dump(exclude_none=True) for msg in request.messages]
+        # Convert messages to dict format (exclude None values for llama.cpp compatibility)
+        messages = [msg.model_dump(exclude_none=True) for msg in request.messages]
 
         # WORKAROUND: Disable streaming when tools are present
         # vLLM's Mistral tool parser has a bug with streaming tool calls
@@ -142,16 +133,9 @@ async def chat_completions(request: ChatCompletionRequest):
         if force_no_stream and request.stream:
             logger.info("Forcing non-streaming mode due to tool calls (vLLM bug workaround)")
 
-        # WORKAROUND: Disable RAG when tools are present
-        # RAG context can confuse models during complex tool calling tasks
-        use_rag = request.use_rag
-        if bool(request.tools) and settings.disable_rag_with_tools:
-            use_rag = False
-            logger.info("Disabling RAG due to tool calls (model focus workaround)")
-
         if request.stream and not force_no_stream:
             return StreamingResponse(
-                stream_response(rag_chain, messages, request, use_rag),
+                stream_response(rag_chain, messages, request),
                 media_type="text/event-stream",
                 headers={"X-Accel-Buffering": "no"},
             )
@@ -160,7 +144,7 @@ async def chat_completions(request: ChatCompletionRequest):
         result = await rag_chain.query(
             messages=messages,
             collection=request.collection,
-            use_rag=use_rag,
+            use_rag=request.use_rag,
             stream=False,
             model=request.model,
             temperature=request.temperature,
@@ -197,14 +181,8 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         )
 
-        # Record RAG context chunks if used
-        rag_context = result.get("_rag_context")
-        if rag_context and rag_context.get("contexts_used"):
-            record_context_chunks(rag_context["contexts_used"])
-
         # If client wanted streaming but we forced non-streaming, wrap response in SSE format
         if force_no_stream and request.stream:
-            record_request("chat/completions", status, time.time() - start_time)
             return StreamingResponse(
                 fake_stream_response(result),
                 media_type="text/event-stream",
@@ -212,12 +190,10 @@ async def chat_completions(request: ChatCompletionRequest):
             )
 
         # Return raw LLM response with RAG context (preserves all vLLM fields)
-        record_request("chat/completions", status, time.time() - start_time)
         return result
 
     except Exception as e:
         logger.exception("Chat completion error")
-        record_request("chat/completions", "error", time.time() - start_time)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -225,14 +201,13 @@ async def stream_response(
     rag_chain,
     messages: list,
     request: ChatCompletionRequest,
-    use_rag: bool,
 ) -> AsyncGenerator[str, None]:
     """Generate streaming response."""
     try:
         async for chunk in await rag_chain.query(
             messages=messages,
             collection=request.collection,
-            use_rag=use_rag,
+            use_rag=request.use_rag,
             stream=True,
             model=request.model,
             temperature=request.temperature,

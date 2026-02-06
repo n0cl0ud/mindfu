@@ -45,10 +45,6 @@ class Settings(BaseSettings):
     # Set to False for models with working streaming tool calls (e.g., Nemotron with qwen3_coder)
     force_no_stream_with_tools: bool = True
 
-    # Disable RAG augmentation when tools are present
-    # RAG context can confuse models during tool calling
-    disable_rag_with_tools: bool = True
-
     @property
     def postgres_url(self) -> str:
         return f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

@@ -170,8 +170,6 @@ services:
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
       - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
     volumes:
-      # Mount source code for hot-reload (no rebuild needed)
-      - ./services/rag/src:/app/src:ro
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations
       - embedding-cache:/root/.cache/huggingface
@@ -203,7 +201,6 @@ services:
   # LLM Inference - vLLM (full precision with FP8 KV cache)
   # ---------------------------------------------------------------------------
   llm-vllm:
-    # Pin to Monday Feb 3 nightly with CUDA 13.0 - tool calling regression in newer builds
     image: vllm/vllm-openai:${VLLM_VERSION:-cu130-nightly-4c4b6f7a9764bac8bf9f2a0bfedf852d8e59c98e}
     container_name: mindfu-llm-vllm
     ipc: host
@@ -277,14 +274,7 @@ services:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
       - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
-      # Streaming with tools - DISABLED due to vLLM Mistral parser bugs
-      # See: https://github.com/vllm-project/vllm/issues/17585
-      - FORCE_NO_STREAM_WITH_TOOLS=true
-      # RAG with tools - DISABLED to help model focus on tool calling
-      - DISABLE_RAG_WITH_TOOLS=true
     volumes:
-      # Mount source code for hot-reload (no rebuild needed)
-      - ./services/rag/src:/app/src:ro
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations
       - embedding-cache:/root/.cache/huggingface
@@ -316,22 +306,18 @@ services:
   # LLM Inference - vLLM with Nemotron 3 Nano (30B params, 3B active MoE)
   # ---------------------------------------------------------------------------
   llm-nemotron:
-    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
+    image: vllm/vllm-openai:v0.14.1-cu130
     container_name: mindfu-llm-nemotron
     ipc: host
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/local/cuda/lib64
       - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       - model-cache:/root/.cache/huggingface
-      # PATCH: Fix JSONDecodeError on malformed tool call arguments
-      - ./configs/vllm/entrypoint-patch.sh:/entrypoint-patch.sh:ro
     ports:
       - "8000:8000"
-    entrypoint: ["/bin/bash", "/entrypoint-patch.sh"]
     command: >
-      --model nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
+      nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
       --host 0.0.0.0
       --port 8000
       --max-model-len 65536
@@ -385,8 +371,6 @@ services:
       # Nemotron uses qwen3_coder parser which supports streaming tool calls
       - FORCE_NO_STREAM_WITH_TOOLS=false
     volumes:
-      # Mount source code for hot-reload (no rebuild needed)
-      - ./services/rag/src:/app/src:ro
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations
       - embedding-cache:/root/.cache/huggingface
