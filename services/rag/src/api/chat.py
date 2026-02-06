@@ -121,8 +121,9 @@ async def chat_completions(request: ChatCompletionRequest):
     try:
         rag_chain = get_rag_chain()
 
-        # Convert messages to dict format (exclude None values for llama.cpp compatibility)
-        messages = [msg.model_dump(exclude_none=True) for msg in request.messages]
+        # Convert messages to dict format
+        # NOTE: Do NOT use exclude_none=True - vLLM needs content:null for tool call messages
+        messages = [msg.model_dump() for msg in request.messages]
 
         # WORKAROUND: Disable streaming when tools are present
         # vLLM's Mistral tool parser has a bug with streaming tool calls
