@@ -122,8 +122,15 @@ async def chat_completions(request: ChatCompletionRequest):
         rag_chain = get_rag_chain()
 
         # Convert messages to dict format
-        # NOTE: Do NOT use exclude_none=True - vLLM needs content:null for tool call messages
-        messages = [msg.model_dump() for msg in request.messages]
+        # Keep content field (even if None) for vLLM tool call compatibility
+        # But exclude other None fields to avoid 400 errors
+        def convert_message(msg):
+            d = msg.model_dump(exclude_none=True)
+            # Preserve content:null for assistant messages with tool_calls
+            if msg.role == "assistant" and msg.tool_calls and msg.content is None:
+                d["content"] = None
+            return d
+        messages = [convert_message(msg) for msg in request.messages]
 
         # WORKAROUND: Disable streaming when tools are present
         # vLLM's Mistral tool parser has a bug with streaming tool calls
