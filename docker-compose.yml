@@ -203,7 +203,8 @@ services:
   # LLM Inference - vLLM (full precision with FP8 KV cache)
   # ---------------------------------------------------------------------------
   llm-vllm:
-    image: vllm/vllm-openai:${VLLM_VERSION:-nightly}
+    # Pin to Monday Feb 3 nightly with CUDA 13.0 - tool calling regression in newer builds
+    image: vllm/vllm-openai:${VLLM_VERSION:-cu130-nightly-4c4b6f7a9764bac8bf9f2a0bfedf852d8e59c98e}
     container_name: mindfu-llm-vllm
     ipc: host
     environment:
