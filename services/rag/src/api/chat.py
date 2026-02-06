@@ -214,13 +214,12 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         )
 
-        # If client wanted streaming but we forced non-streaming, wrap response in SSE format
+        # If client wanted streaming but we forced non-streaming for tool calls,
+        # return non-streaming JSON directly. Vibe can handle non-streaming responses
+        # and cannot properly accumulate streamed tool_call arguments.
+        # See: https://github.com/mistralai/mistral-vibe/issues/252
         if force_no_stream and request.stream:
-            return StreamingResponse(
-                fake_stream_response(result),
-                media_type="text/event-stream",
-                headers={"X-Accel-Buffering": "no"},
-            )
+            logger.info("Returning non-streaming JSON for tool call (Vibe can't accumulate streamed tool_calls)")
 
         # Return raw LLM response with RAG context (preserves all vLLM fields)
         return result
