@@ -170,7 +170,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
         if request.stream and not force_no_stream:
             return StreamingResponse(
-                stream_response(rag_chain, messages, request),
+                stream_response(rag_chain, messages, request, use_rag),
                 media_type="text/event-stream",
                 headers={"X-Accel-Buffering": "no"},
             )
@@ -235,13 +235,14 @@ async def stream_response(
     rag_chain,
     messages: list,
     request: ChatCompletionRequest,
+    use_rag: bool,
 ) -> AsyncGenerator[str, None]:
     """Generate streaming response."""
     try:
         async for chunk in await rag_chain.query(
             messages=messages,
             collection=request.collection,
-            use_rag=request.use_rag,
+            use_rag=use_rag,
             stream=True,
             model=request.model,
             temperature=request.temperature,
