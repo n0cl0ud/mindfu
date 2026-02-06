@@ -279,6 +279,8 @@ services:
       # Streaming with tools - DISABLED due to vLLM Mistral parser bugs
       # See: https://github.com/vllm-project/vllm/issues/17585
       - FORCE_NO_STREAM_WITH_TOOLS=true
+      # RAG with tools - DISABLED to help model focus on tool calling
+      - DISABLE_RAG_WITH_TOOLS=true
     volumes:
       # Mount source code for hot-reload (no rebuild needed)
       - ./services/rag/src:/app/src:ro

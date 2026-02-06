@@ -137,9 +137,16 @@ async def chat_completions(request: ChatCompletionRequest):
         if force_no_stream and request.stream:
             logger.info("Forcing non-streaming mode due to tool calls (vLLM bug workaround)")
 
+        # WORKAROUND: Disable RAG when tools are present
+        # RAG context can confuse models during complex tool calling tasks
+        use_rag = request.use_rag
+        if bool(request.tools) and settings.disable_rag_with_tools:
+            use_rag = False
+            logger.info("Disabling RAG due to tool calls (model focus workaround)")
+
         if request.stream and not force_no_stream:
             return StreamingResponse(
-                stream_response(rag_chain, messages, request),
+                stream_response(rag_chain, messages, request, use_rag),
                 media_type="text/event-stream",
                 headers={"X-Accel-Buffering": "no"},
             )
@@ -148,7 +155,7 @@ async def chat_completions(request: ChatCompletionRequest):
         result = await rag_chain.query(
             messages=messages,
             collection=request.collection,
-            use_rag=request.use_rag,
+            use_rag=use_rag,
             stream=False,
             model=request.model,
             temperature=request.temperature,
@@ -213,13 +220,14 @@ async def stream_response(
     rag_chain,
     messages: list,
     request: ChatCompletionRequest,
+    use_rag: bool,
 ) -> AsyncGenerator[str, None]:
     """Generate streaming response."""
     try:
         async for chunk in await rag_chain.query(
             messages=messages,
             collection=request.collection,
-            use_rag=request.use_rag,
+            use_rag=use_rag,
             stream=True,
             model=request.model,
             temperature=request.temperature,
