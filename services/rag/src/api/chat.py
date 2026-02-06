@@ -150,14 +150,16 @@ async def chat_completions(request: ChatCompletionRequest):
             return d
         messages = [convert_message(msg) for msg in request.messages]
 
-        # WORKAROUND: Disable streaming when tools are present
-        # vLLM's Mistral tool parser has a bug with streaming tool calls
-        # See: https://github.com/vllm-project/vllm/issues/17585
-        # Can be disabled via FORCE_NO_STREAM_WITH_TOOLS=false for models with working streaming (e.g., Nemotron)
+        # Check if we should force non-streaming for tool calls
+        # This was a workaround for vLLM Mistral parser bugs, but may cause issues with Vibe
+        # which expects SSE streaming format. Disable via FORCE_NO_STREAM_WITH_TOOLS=false
         settings = get_settings()
         force_no_stream = bool(request.tools) and settings.force_no_stream_with_tools
         if force_no_stream and request.stream:
             logger.info("Forcing non-streaming mode due to tool calls (vLLM bug workaround)")
+
+        # Log streaming mode for debugging
+        logger.info(f"Request: stream={request.stream}, tools={bool(request.tools)}, force_no_stream={force_no_stream}")
 
         # WORKAROUND: Disable RAG when tools are present
         # RAG context can confuse models during tool calling tasks
