@@ -196,13 +196,12 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         )
 
-        # If client wanted streaming but we forced non-streaming, wrap response in SSE format
+        # If client wanted streaming but we forced non-streaming, return non-streaming response
+        # NOTE: fake_stream_response was causing issues with Vibe parsing tool_calls
+        # Vibe should handle non-streaming responses fine
         if force_no_stream and request.stream:
-            return StreamingResponse(
-                fake_stream_response(result),
-                media_type="text/event-stream",
-                headers={"X-Accel-Buffering": "no"},
-            )
+            # Return as non-streaming JSON response instead of fake SSE
+            return result
 
         # Return raw LLM response with RAG context (preserves all vLLM fields)
         return result
