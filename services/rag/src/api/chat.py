@@ -128,6 +128,13 @@ async def chat_completions(request: ChatCompletionRequest):
         # Convert messages to dict format (exclude None values for llama.cpp compatibility)
         messages = [msg.model_dump(exclude_none=True) for msg in request.messages]
 
+        # Filter out empty assistant messages (Mistral tokenizer rejects them)
+        # Invalid: role='assistant' content='' tool_calls=None
+        messages = [
+            msg for msg in messages
+            if not (msg.get("role") == "assistant" and not msg.get("content") and not msg.get("tool_calls"))
+        ]
+
         # WORKAROUND: Disable streaming when tools are present
         # vLLM's Mistral tool parser has a bug with streaming tool calls
         # See: https://github.com/vllm-project/vllm/issues/17585
