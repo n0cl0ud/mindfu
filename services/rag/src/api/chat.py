@@ -50,30 +50,22 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     if content:
         yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': content}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
-    # Stream tool_calls in OpenAI incremental format
+    # Stream tool_calls - send complete tool_call in single chunk
+    # (incremental streaming was causing Vibe to not accumulate arguments properly)
     tool_calls = message.get("tool_calls")
     if tool_calls:
+        streaming_tool_calls = []
         for i, tc in enumerate(tool_calls):
-            # First chunk for this tool: id, type, function name, empty arguments
-            first_tc_chunk = {
+            streaming_tool_calls.append({
                 "index": i,
                 "id": tc.get("id", ""),
                 "type": tc.get("type", "function"),
                 "function": {
                     "name": tc.get("function", {}).get("name", ""),
-                    "arguments": ""
+                    "arguments": tc.get("function", {}).get("arguments", "")
                 }
-            }
-            yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': [first_tc_chunk]}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
-
-            # Second chunk: the arguments
-            args = tc.get("function", {}).get("arguments", "")
-            if args:
-                args_chunk = {
-                    "index": i,
-                    "function": {"arguments": args}
-                }
-                yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': [args_chunk]}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+            })
+        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': streaming_tool_calls}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
 
     # Final chunk: finish_reason + usage
     final_chunk = {
