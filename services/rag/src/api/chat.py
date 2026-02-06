@@ -56,16 +56,21 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     if tool_calls:
         streaming_tool_calls = []
         for i, tc in enumerate(tool_calls):
+            args = tc.get("function", {}).get("arguments", "")
+            logger.info(f"DEBUG fake_stream tool_call[{i}]: id={tc.get('id')}, name={tc.get('function', {}).get('name')}, args_len={len(args)}, args_preview={args[:200] if args else 'empty'}")
             streaming_tool_calls.append({
                 "index": i,
                 "id": tc.get("id", ""),
                 "type": tc.get("type", "function"),
                 "function": {
                     "name": tc.get("function", {}).get("name", ""),
-                    "arguments": tc.get("function", {}).get("arguments", "")
+                    "arguments": args
                 }
             })
-        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': streaming_tool_calls}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+        chunk_data = {'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'tool_calls': streaming_tool_calls}, 'logprobs': None, 'finish_reason': None}]}
+        chunk_str = json.dumps(chunk_data)
+        logger.info(f"DEBUG fake_stream yielding tool_calls chunk: {chunk_str[:500]}")
+        yield f"data: {chunk_str}\n\n"
 
     # Final chunk: finish_reason + usage
     final_chunk = {
