@@ -155,6 +155,9 @@ services:
   rag:
     image: ghcr.io/n0cl0ud/mindfu-rag:latest
     container_name: mindfu-rag
+    volumes:
+      # Mount source code for hot-reload (no rebuild needed)
+      - ./services/rag/src:/app/src:ro
     environment:
       - LLM_BASE_URL=http://llm:8000/v1
       - QDRANT_HOST=qdrant
@@ -259,6 +262,9 @@ services:
   rag-vllm:
     image: ghcr.io/n0cl0ud/mindfu-rag:latest
     container_name: mindfu-rag-vllm
+    volumes:
+      # Mount source code for hot-reload (no rebuild needed)
+      - ./services/rag/src:/app/src:ro
     environment:
       - LLM_BASE_URL=http://llm-vllm:8000/v1
       - LLM_MODEL=${VLLM_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
@@ -359,6 +365,9 @@ services:
   rag-nemotron:
     image: ghcr.io/n0cl0ud/mindfu-rag:latest
     container_name: mindfu-rag-nemotron
+    volumes:
+      # Mount source code for hot-reload (no rebuild needed)
+      - ./services/rag/src:/app/src:ro
     environment:
       - LLM_BASE_URL=http://llm-nemotron:8000/v1
       - LLM_MODEL=nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8
