@@ -28,8 +28,13 @@ router = APIRouter(prefix="/v1", tags=["chat"])
 async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     """
     Convert a non-streaming response to SSE format.
-    Used when we force non-streaming due to vLLM tool call bugs but client expects streaming.
-    Streams tool_calls in OpenAI-compatible incremental format.
+    Used when we force non-streaming due to vLLM Mistral streaming bugs but client expects SSE.
+    Sends complete tool_calls in a single chunk so Vibe doesn't need to accumulate arguments.
+
+    Known vLLM issues with Mistral streaming tool calls:
+    - https://github.com/vllm-project/vllm/issues/17585
+    - https://github.com/vllm-project/vllm/issues/20028
+    - https://github.com/vllm-project/vllm/issues/29968
     """
     if not result.get("choices"):
         yield "data: [DONE]\n\n"
@@ -52,22 +57,17 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
         # Send role + complete tool_calls in same chunk (Vibe expects them together)
         streaming_tool_calls = []
         for i, tc in enumerate(tool_calls):
-            args = tc.get("function", {}).get("arguments", "")
-            logger.info(f"DEBUG fake_stream tool_call[{i}]: id={tc.get('id')}, name={tc.get('function', {}).get('name')}, args_len={len(args)}, args_preview={args[:200] if args else 'empty'}")
             streaming_tool_calls.append({
                 "index": i,
                 "id": tc.get("id", ""),
                 "type": tc.get("type", "function"),
                 "function": {
                     "name": tc.get("function", {}).get("name", ""),
-                    "arguments": args
+                    "arguments": tc.get("function", {}).get("arguments", "")
                 }
             })
         first_delta["tool_calls"] = streaming_tool_calls
-        chunk_data = {'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]}
-        chunk_str = json.dumps(chunk_data)
-        logger.info(f"DEBUG fake_stream yielding role+tool_calls chunk: {chunk_str[:500]}")
-        yield f"data: {chunk_str}\n\n"
+        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]})}\n\n"
     else:
         # No tool calls - send role, then content
         yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]})}\n\n"
@@ -87,7 +87,6 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
         final_chunk['usage'] = usage
     yield f"data: {json.dumps(final_chunk)}\n\n"
 
-    # Send the [DONE] marker
     yield "data: [DONE]\n\n"
 
 
@@ -217,13 +216,17 @@ async def chat_completions(request: ChatCompletionRequest):
         )
 
         # If client wanted streaming but we forced non-streaming for tool calls,
-        # return non-streaming JSON directly. Vibe can handle non-streaming responses
-        # and cannot properly accumulate streamed tool_call arguments.
-        # See: https://github.com/mistralai/mistral-vibe/issues/252
+        # wrap in fake_stream_response to return proper SSE format.
+        # vLLM Mistral streaming tool calls are broken (args get corrupted).
         if force_no_stream and request.stream:
-            logger.info("Returning non-streaming JSON for tool call (Vibe can't accumulate streamed tool_calls)")
+            logger.info("Wrapping non-streaming tool call response as SSE (vLLM Mistral streaming bug)")
+            return StreamingResponse(
+                fake_stream_response(result),
+                media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no"},
+            )
 
-        # Return raw LLM response with RAG context (preserves all vLLM fields)
+        # Return raw LLM response (preserves all vLLM fields)
         return result
 
     except Exception as e:
