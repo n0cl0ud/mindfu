@@ -27,9 +27,13 @@ router = APIRouter(prefix="/v1", tags=["chat"])
 
 async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     """
-    Convert a non-streaming response to SSE format.
+    Convert a non-streaming response to OpenAI-exact SSE format.
     Used when we force non-streaming due to vLLM Mistral streaming bugs but client expects SSE.
-    Sends complete tool_calls in a single chunk so Vibe doesn't need to accumulate arguments.
+
+    Follows the exact OpenAI streaming format for tool calls:
+    1. role + tool_call init (id, type, name, empty arguments)
+    2. tool_call arguments (complete, in one chunk)
+    3. finish_reason + usage
 
     Known vLLM issues with Mistral streaming tool calls:
     - https://github.com/vllm-project/vllm/issues/17585
@@ -50,30 +54,34 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     content = message.get("content")
     tool_calls = message.get("tool_calls")
 
-    # Build first delta with role (and tool_calls if present - must be together for Vibe)
-    first_delta = {"role": "assistant"}
+    def make_chunk(delta, finish_reason=None):
+        return json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': delta, 'logprobs': None, 'finish_reason': finish_reason}]})
 
     if tool_calls:
-        # Send role + complete tool_calls in same chunk (Vibe expects them together)
-        streaming_tool_calls = []
+        # OpenAI format: chunk 1 = role + tool_call init (name, id, empty arguments)
+        init_tool_calls = []
         for i, tc in enumerate(tool_calls):
-            streaming_tool_calls.append({
+            init_tool_calls.append({
                 "index": i,
                 "id": tc.get("id", ""),
                 "type": tc.get("type", "function"),
                 "function": {
                     "name": tc.get("function", {}).get("name", ""),
-                    "arguments": tc.get("function", {}).get("arguments", "")
+                    "arguments": ""
                 }
             })
-        first_delta["tool_calls"] = streaming_tool_calls
-        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]})}\n\n"
-    else:
-        # No tool calls - send role, then content
-        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+        yield f"data: {make_chunk({'role': 'assistant', 'tool_calls': init_tool_calls})}\n\n"
 
+        # OpenAI format: chunk 2..N = arguments (we send complete args in one chunk)
+        for i, tc in enumerate(tool_calls):
+            args = tc.get("function", {}).get("arguments", "")
+            if args:
+                yield f"data: {make_chunk({'tool_calls': [{'index': i, 'function': {'arguments': args}}]})}\n\n"
+    else:
+        # Text response: role, then content
+        yield f"data: {make_chunk({'role': 'assistant'})}\n\n"
         if content:
-            yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': content}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+            yield f"data: {make_chunk({'content': content})}\n\n"
 
     # Final chunk: finish_reason + usage
     final_chunk = {
