@@ -292,6 +292,19 @@ async def chat_completions(request: ChatCompletionRequest):
             }
         })
 
+    except httpx.TimeoutException:
+        approx_tokens = sum(len(json.dumps(m)) for m in messages) // 4
+        logger.warning(f"LLM request timed out (~{approx_tokens} estimated tokens)")
+        return JSONResponse(status_code=408, content={
+            "error": {
+                "message": f"Request timed out after {settings.llm_timeout}s. "
+                           f"The conversation may be too long (~{approx_tokens} estimated tokens) "
+                           f"or the response too large. Please reduce the conversation length.",
+                "type": "timeout_error",
+                "code": "request_timeout",
+            }
+        })
+
     except Exception as e:
         logger.exception("Chat completion error")
         raise HTTPException(status_code=500, detail=str(e))
