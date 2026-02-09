@@ -350,14 +350,16 @@ async def stream_response(
 @router.get("/models")
 async def list_models():
     """List available models (OpenAI-compatible)."""
+    settings = get_settings()
     return {
         "object": "list",
         "data": [
             {
-                "id": "devstral-small-2",
+                "id": settings.llm_model,
                 "object": "model",
                 "created": int(datetime.now().timestamp()),
                 "owned_by": "mindfu",
+                "context_window": settings.max_model_len,
             }
         ],
     }
@@ -366,9 +368,11 @@ async def list_models():
 @router.get("/models/{model_id}")
 async def get_model(model_id: str):
     """Get model info (OpenAI-compatible)."""
+    settings = get_settings()
     return {
         "id": model_id,
         "object": "model",
         "created": int(datetime.now().timestamp()),
         "owned_by": "mindfu",
+        "context_window": settings.max_model_len,
     }
