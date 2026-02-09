@@ -32,7 +32,7 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
 
     Follows the exact OpenAI streaming format for tool calls:
     1. role + tool_call init (id, type, name, empty arguments)
-    2. tool_call arguments (complete, in one chunk)
+    2. tool_call arguments (streamed incrementally in small chunks)
     3. finish_reason + usage
 
     Known vLLM issues with Mistral streaming tool calls:
@@ -72,11 +72,17 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
             })
         yield f"data: {make_chunk({'role': 'assistant', 'tool_calls': init_tool_calls})}\n\n"
 
-        # OpenAI format: chunk 2..N = arguments (we send complete args in one chunk)
+        # OpenAI format: chunk 2..N = arguments streamed incrementally
+        # Real OpenAI streaming sends arguments in small chunks, not all at once.
+        # Large tool calls (e.g. write_file with full file content) need chunking
+        # so clients like Vibe can parse them progressively.
+        ARG_CHUNK_SIZE = 512
         for i, tc in enumerate(tool_calls):
             args = tc.get("function", {}).get("arguments", "")
             if args:
-                yield f"data: {make_chunk({'tool_calls': [{'index': i, 'function': {'arguments': args}}]})}\n\n"
+                for offset in range(0, len(args), ARG_CHUNK_SIZE):
+                    chunk_args = args[offset:offset + ARG_CHUNK_SIZE]
+                    yield f"data: {make_chunk({'tool_calls': [{'index': i, 'function': {'arguments': chunk_args}}]})}\n\n"
     else:
         # Text response: role, then content
         yield f"data: {make_chunk({'role': 'assistant'})}\n\n"
