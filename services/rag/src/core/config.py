@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Logging
     log_conversations: bool = False
 
+    # Model context limit (for error messages)
+    max_model_len: int = 81920
+
     # Workarounds
     # Disable streaming when tools are present (vLLM Mistral parser bug)
     # Set to False for models with working streaming tool calls (e.g., Nemotron with qwen3_coder)

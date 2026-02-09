@@ -8,8 +8,9 @@ import uuid
 from datetime import datetime
 from typing import AsyncGenerator
 
+import httpx
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..core.config import get_settings
 from ..core.rag_chain import get_rag_chain
@@ -249,6 +250,47 @@ async def chat_completions(request: ChatCompletionRequest):
 
         # Return raw LLM response (preserves all vLLM fields)
         return result
+
+    except httpx.HTTPStatusError as e:
+        # Forward vLLM errors in OpenAI-compatible format
+        status = e.response.status_code
+        try:
+            body = e.response.json()
+            vllm_msg = body.get("message", "") or body.get("error", {}).get("message", "")
+        except Exception:
+            vllm_msg = e.response.text[:500]
+
+        # Detect context length exceeded
+        is_context_error = any(k in vllm_msg.lower() for k in [
+            "maximum context length", "prompt is too long",
+            "input tokens", "exceed", "too many tokens",
+        ])
+        # Also detect by input size (rough estimate: 4 chars per token)
+        approx_tokens = sum(len(json.dumps(m)) for m in messages) // 4
+        if not is_context_error and status >= 400:
+            is_context_error = approx_tokens > 60000  # ~75% of 81920
+
+        if is_context_error:
+            logger.warning(f"Context length exceeded: ~{approx_tokens} tokens estimated")
+            return JSONResponse(status_code=400, content={
+                "error": {
+                    "message": f"This model's maximum context length is {settings.max_model_len} tokens. "
+                               f"Your messages resulted in approximately {approx_tokens} tokens. "
+                               f"Please reduce the length of the messages.",
+                    "type": "invalid_request_error",
+                    "param": "messages",
+                    "code": "context_length_exceeded",
+                }
+            })
+
+        logger.exception("LLM backend error")
+        return JSONResponse(status_code=status, content={
+            "error": {
+                "message": vllm_msg or str(e),
+                "type": "server_error",
+                "code": None,
+            }
+        })
 
     except Exception as e:
         logger.exception("Chat completion error")
