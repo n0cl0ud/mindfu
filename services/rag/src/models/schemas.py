@@ -57,7 +57,7 @@ class ChatCompletionRequest(BaseModel):
     model: str = "devstral-small-2"
     messages: List[ChatMessage]
     temperature: float = Field(default=0.7, ge=0, le=2)
-    max_tokens: Optional[int] = Field(default=2048, ge=1)
+    max_tokens: Optional[int] = Field(default=None, ge=1)
     stream: bool = False
     stream_options: Optional[StreamOptions] = None
     top_p: float = Field(default=1.0, ge=0, le=1)

@@ -217,6 +217,13 @@ async def chat_completions(request: ChatCompletionRequest):
             response_tool_calls = message.get("tool_calls")
             finish_reason = first_choice.get("finish_reason")
 
+            # Log tool call details for debugging truncation issues
+            if response_tool_calls:
+                for i, tc in enumerate(response_tool_calls):
+                    args = tc.get("function", {}).get("arguments", "")
+                    args_len = len(args) if isinstance(args, str) else -1
+                    logger.info(f"Tool call {i}: {tc.get('function', {}).get('name', '?')} args_len={args_len} finish={finish_reason}")
+
         asyncio.create_task(
             log_conversation_async(
                 model=request.model,

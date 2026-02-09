@@ -167,8 +167,12 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
                 "model": self.settings.llm_model,
                 "messages": messages,
                 "temperature": kwargs.get("temperature", 0.7),
-                "max_tokens": kwargs.get("max_tokens", 2048),
             }
+
+            # Only include max_tokens if explicitly set (None = let vLLM use model default)
+            max_tokens = kwargs.get("max_tokens")
+            if max_tokens is not None:
+                request_data["max_tokens"] = max_tokens
 
             # Forward tool-related parameters
             if kwargs.get("tools"):
@@ -221,10 +225,14 @@ IMPORTANT: When multiple versions of documentation are present in the context, a
                 "model": self.settings.llm_model,
                 "messages": messages,
                 "temperature": kwargs.get("temperature", 0.7),
-                "max_tokens": kwargs.get("max_tokens", 2048),
                 "stream": True,
                 "stream_options": stream_options,
             }
+
+            # Only include max_tokens if explicitly set (None = let vLLM use model default)
+            max_tokens = kwargs.get("max_tokens")
+            if max_tokens is not None:
+                request_data["max_tokens"] = max_tokens
 
             # Forward tool-related parameters
             if kwargs.get("tools"):
