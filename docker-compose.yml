@@ -222,10 +222,13 @@ services:
     entrypoint: ["/bin/bash", "/entrypoint-patch.sh"]
     command: >
       --model ${VLLM_MODEL:-mistralai/Devstral-Small-2-24B-Instruct-2512}
+      --tokenizer_mode mistral
+      --config_format mistral
+      --load_format mistral
       --host 0.0.0.0
       --port 8000
       --dtype auto
-      --max-model-len ${VLLM_MAX_MODEL_LEN:-81920}
+      --max-model-len ${VLLM_MAX_MODEL_LEN:-131072}
       --gpu-memory-utilization ${VLLM_GPU_MEM:-0.95}
       --kv-cache-dtype ${VLLM_KV_CACHE_DTYPE:-fp8}
       --tool-call-parser mistral
@@ -274,8 +277,6 @@ services:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       - DEFAULT_COLLECTION=${DEFAULT_COLLECTION:-documents}
       - LOG_CONVERSATIONS=${LOG_CONVERSATIONS:-false}
-      # Let vLLM stream tool calls natively - our fake_stream wrapper breaks Vibe
-      - FORCE_NO_STREAM_WITH_TOOLS=false
     volumes:
       - ./data/documents:/app/documents
       - ./data/conversations:/app/conversations

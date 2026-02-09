@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # LLM Configuration
     llm_base_url: str = "http://llm:8000/v1"
     llm_model: str = "devstral-small-2"
-    llm_timeout: int = 120
+    llm_timeout: int = 300
 
     # Qdrant Configuration
     qdrant_host: str = "qdrant"
@@ -39,6 +39,9 @@ class Settings(BaseSettings):
 
     # Logging
     log_conversations: bool = False
+
+    # Model context limit (for error messages)
+    max_model_len: int = 131072
 
     # Workarounds
     # Disable streaming when tools are present (vLLM Mistral parser bug)

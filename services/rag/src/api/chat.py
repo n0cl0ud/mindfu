@@ -8,8 +8,9 @@ import uuid
 from datetime import datetime
 from typing import AsyncGenerator
 
+import httpx
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..core.config import get_settings
 from ..core.rag_chain import get_rag_chain
@@ -27,9 +28,18 @@ router = APIRouter(prefix="/v1", tags=["chat"])
 
 async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     """
-    Convert a non-streaming response to SSE format.
-    Used when we force non-streaming due to vLLM tool call bugs but client expects streaming.
-    Streams tool_calls in OpenAI-compatible incremental format.
+    Convert a non-streaming response to OpenAI-exact SSE format.
+    Used when we force non-streaming due to vLLM Mistral streaming bugs but client expects SSE.
+
+    Follows the exact OpenAI streaming format for tool calls:
+    1. role + tool_call init (id, type, name, empty arguments)
+    2. tool_call arguments (streamed incrementally in small chunks)
+    3. finish_reason + usage
+
+    Known vLLM issues with Mistral streaming tool calls:
+    - https://github.com/vllm-project/vllm/issues/17585
+    - https://github.com/vllm-project/vllm/issues/20028
+    - https://github.com/vllm-project/vllm/issues/29968
     """
     if not result.get("choices"):
         yield "data: [DONE]\n\n"
@@ -45,35 +55,40 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
     content = message.get("content")
     tool_calls = message.get("tool_calls")
 
-    # Build first delta with role (and tool_calls if present - must be together for Vibe)
-    first_delta = {"role": "assistant"}
+    def make_chunk(delta, finish_reason=None):
+        return json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': delta, 'logprobs': None, 'finish_reason': finish_reason}]})
 
     if tool_calls:
-        # Send role + complete tool_calls in same chunk (Vibe expects them together)
-        streaming_tool_calls = []
+        # OpenAI format: chunk 1 = role + tool_call init (name, id, empty arguments)
+        init_tool_calls = []
         for i, tc in enumerate(tool_calls):
-            args = tc.get("function", {}).get("arguments", "")
-            logger.info(f"DEBUG fake_stream tool_call[{i}]: id={tc.get('id')}, name={tc.get('function', {}).get('name')}, args_len={len(args)}, args_preview={args[:200] if args else 'empty'}")
-            streaming_tool_calls.append({
+            init_tool_calls.append({
                 "index": i,
                 "id": tc.get("id", ""),
                 "type": tc.get("type", "function"),
                 "function": {
                     "name": tc.get("function", {}).get("name", ""),
-                    "arguments": args
+                    "arguments": ""
                 }
             })
-        first_delta["tool_calls"] = streaming_tool_calls
-        chunk_data = {'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]}
-        chunk_str = json.dumps(chunk_data)
-        logger.info(f"DEBUG fake_stream yielding role+tool_calls chunk: {chunk_str[:500]}")
-        yield f"data: {chunk_str}\n\n"
-    else:
-        # No tool calls - send role, then content
-        yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': first_delta, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+        yield f"data: {make_chunk({'role': 'assistant', 'tool_calls': init_tool_calls})}\n\n"
 
+        # OpenAI format: chunk 2..N = arguments streamed incrementally
+        # Real OpenAI streaming sends arguments in small chunks, not all at once.
+        # Large tool calls (e.g. write_file with full file content) need chunking
+        # so clients like Vibe can parse them progressively.
+        ARG_CHUNK_SIZE = 512
+        for i, tc in enumerate(tool_calls):
+            args = tc.get("function", {}).get("arguments", "")
+            if args:
+                for offset in range(0, len(args), ARG_CHUNK_SIZE):
+                    chunk_args = args[offset:offset + ARG_CHUNK_SIZE]
+                    yield f"data: {make_chunk({'tool_calls': [{'index': i, 'function': {'arguments': chunk_args}}]})}\n\n"
+    else:
+        # Text response: role, then content
+        yield f"data: {make_chunk({'role': 'assistant'})}\n\n"
         if content:
-            yield f"data: {json.dumps({'id': chunk_id, 'object': 'chat.completion.chunk', 'created': created, 'model': model, 'choices': [{'index': 0, 'delta': {'content': content}, 'logprobs': None, 'finish_reason': None}]})}\n\n"
+            yield f"data: {make_chunk({'content': content})}\n\n"
 
     # Final chunk: finish_reason + usage
     final_chunk = {
@@ -87,7 +102,6 @@ async def fake_stream_response(result: dict) -> AsyncGenerator[str, None]:
         final_chunk['usage'] = usage
     yield f"data: {json.dumps(final_chunk)}\n\n"
 
-    # Send the [DONE] marker
     yield "data: [DONE]\n\n"
 
 
@@ -204,6 +218,13 @@ async def chat_completions(request: ChatCompletionRequest):
             response_tool_calls = message.get("tool_calls")
             finish_reason = first_choice.get("finish_reason")
 
+            # Log tool call details for debugging truncation issues
+            if response_tool_calls:
+                for i, tc in enumerate(response_tool_calls):
+                    args = tc.get("function", {}).get("arguments", "")
+                    args_len = len(args) if isinstance(args, str) else -1
+                    logger.info(f"Tool call {i}: {tc.get('function', {}).get('name', '?')} args_len={args_len} finish={finish_reason}")
+
         asyncio.create_task(
             log_conversation_async(
                 model=request.model,
@@ -217,14 +238,72 @@ async def chat_completions(request: ChatCompletionRequest):
         )
 
         # If client wanted streaming but we forced non-streaming for tool calls,
-        # return non-streaming JSON directly. Vibe can handle non-streaming responses
-        # and cannot properly accumulate streamed tool_call arguments.
-        # See: https://github.com/mistralai/mistral-vibe/issues/252
+        # wrap in fake_stream_response to return proper SSE format.
+        # vLLM Mistral streaming tool calls are broken (args get corrupted).
         if force_no_stream and request.stream:
-            logger.info("Returning non-streaming JSON for tool call (Vibe can't accumulate streamed tool_calls)")
+            logger.info("Wrapping non-streaming tool call response as SSE (vLLM Mistral streaming bug)")
+            return StreamingResponse(
+                fake_stream_response(result),
+                media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no"},
+            )
 
-        # Return raw LLM response with RAG context (preserves all vLLM fields)
+        # Return raw LLM response (preserves all vLLM fields)
         return result
+
+    except httpx.HTTPStatusError as e:
+        # Forward vLLM errors in OpenAI-compatible format
+        status = e.response.status_code
+        try:
+            body = e.response.json()
+            vllm_msg = body.get("message", "") or body.get("error", {}).get("message", "")
+        except Exception:
+            vllm_msg = e.response.text[:500]
+
+        # Detect context length exceeded
+        is_context_error = any(k in vllm_msg.lower() for k in [
+            "maximum context length", "prompt is too long",
+            "input tokens", "exceed", "too many tokens",
+        ])
+        # Also detect by input size (rough estimate: 4 chars per token)
+        approx_tokens = sum(len(json.dumps(m)) for m in messages) // 4
+        if not is_context_error and status >= 400:
+            is_context_error = approx_tokens > 60000  # ~75% of 81920
+
+        if is_context_error:
+            logger.warning(f"Context length exceeded: ~{approx_tokens} tokens estimated")
+            return JSONResponse(status_code=400, content={
+                "error": {
+                    "message": f"This model's maximum context length is {settings.max_model_len} tokens. "
+                               f"Your messages resulted in approximately {approx_tokens} tokens. "
+                               f"Please reduce the length of the messages.",
+                    "type": "invalid_request_error",
+                    "param": "messages",
+                    "code": "context_length_exceeded",
+                }
+            })
+
+        logger.exception("LLM backend error")
+        return JSONResponse(status_code=status, content={
+            "error": {
+                "message": vllm_msg or str(e),
+                "type": "server_error",
+                "code": None,
+            }
+        })
+
+    except httpx.TimeoutException:
+        approx_tokens = sum(len(json.dumps(m)) for m in messages) // 4
+        logger.warning(f"LLM request timed out (~{approx_tokens} estimated tokens)")
+        return JSONResponse(status_code=408, content={
+            "error": {
+                "message": f"Request timed out after {settings.llm_timeout}s. "
+                           f"The conversation may be too long (~{approx_tokens} estimated tokens) "
+                           f"or the response too large. Please reduce the conversation length.",
+                "type": "timeout_error",
+                "code": "request_timeout",
+            }
+        })
 
     except Exception as e:
         logger.exception("Chat completion error")
@@ -271,14 +350,16 @@ async def stream_response(
 @router.get("/models")
 async def list_models():
     """List available models (OpenAI-compatible)."""
+    settings = get_settings()
     return {
         "object": "list",
         "data": [
             {
-                "id": "devstral-small-2",
+                "id": settings.llm_model,
                 "object": "model",
                 "created": int(datetime.now().timestamp()),
                 "owned_by": "mindfu",
+                "context_window": settings.max_model_len,
             }
         ],
     }
@@ -287,9 +368,11 @@ async def list_models():
 @router.get("/models/{model_id}")
 async def get_model(model_id: str):
     """Get model info (OpenAI-compatible)."""
+    settings = get_settings()
     return {
         "id": model_id,
         "object": "model",
         "created": int(datetime.now().timestamp()),
         "owned_by": "mindfu",
+        "context_window": settings.max_model_len,
     }
