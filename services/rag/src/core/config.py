@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     log_conversations: bool = False
 
     # Model context limit (for error messages)
-    max_model_len: int = 81920
+    max_model_len: int = 131072
 
     # Workarounds
     # Disable streaming when tools are present (vLLM Mistral parser bug)
