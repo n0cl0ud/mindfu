@@ -1,0 +1,62 @@
+graph TB
+    subgraph Clients
+        VIBE[Vibe IDE]
+        CLAUDE[Claude CLI]
+        CURL[cURL / API]
+    end
+
+    subgraph "Docker Compose"
+        subgraph "Profile: gguf"
+            LLAMA[llama.cpp<br/>RTX 5080 16GB<br/>GGUF Q4_K_M ~14GB<br/>Port 8000]
+            RAG_GGUF[RAG Service<br/>FastAPI<br/>Port 11434]
+        end
+
+        subgraph "Profile: vllm"
+            VLLM[vLLM<br/>L40S 48GB<br/>FP16 ~24GB<br/>Port 8000<br/>Mistral tokenizer<br/>128K context]
+            RAG_VLLM[RAG Service<br/>FastAPI<br/>Port 11434]
+        end
+
+        subgraph "Shared Services"
+            QDRANT[(Qdrant<br/>Vector DB<br/>Port 6333)]
+            PG[(PostgreSQL<br/>Metadata)]
+        end
+
+        subgraph "Profile: training"
+            TRAIN[Training Service<br/>QLoRA Fine-tuning<br/>L40S / A100<br/>Port 5001]
+            MLFLOW[MLflow<br/>Experiment Tracking<br/>Port 5000]
+        end
+    end
+
+    subgraph "Model"
+        DEVSTRAL[Devstral Small 2<br/>24B params<br/>Mistral AI]
+    end
+
+    VIBE -->|OpenAI API| RAG_GGUF
+    CLAUDE -->|OpenAI API| RAG_GGUF
+    CURL -->|OpenAI API| RAG_GGUF
+    VIBE -->|OpenAI API| RAG_VLLM
+    CLAUDE -->|OpenAI API| RAG_VLLM
+    CURL -->|OpenAI API| RAG_VLLM
+
+    RAG_GGUF -->|/v1/chat/completions| LLAMA
+    RAG_GGUF -->|Embeddings + Search| QDRANT
+    RAG_GGUF -->|Conversation Logs| PG
+
+    RAG_VLLM -->|/v1/chat/completions<br/>Tool calls: non-streaming<br/>+ fake_stream SSE| VLLM
+    RAG_VLLM -->|Embeddings + Search| QDRANT
+    RAG_VLLM -->|Conversation Logs| PG
+
+    LLAMA -.->|Loads| DEVSTRAL
+    VLLM -.->|Loads| DEVSTRAL
+
+    TRAIN -->|Fine-tunes| DEVSTRAL
+    TRAIN -->|Logs| MLFLOW
+    PG -->|Training Data| TRAIN
+
+    style VLLM fill:#4a9eff,stroke:#333,color:#fff
+    style LLAMA fill:#ff9f43,stroke:#333,color:#fff
+    style RAG_GGUF fill:#2ecc71,stroke:#333,color:#fff
+    style RAG_VLLM fill:#2ecc71,stroke:#333,color:#fff
+    style QDRANT fill:#9b59b6,stroke:#333,color:#fff
+    style TRAIN fill:#e74c3c,stroke:#333,color:#fff
+    style DEVSTRAL fill:#1abc9c,stroke:#333,color:#fff

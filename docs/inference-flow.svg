@@ -1,0 +1,473 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 2100" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+<defs>
+  <!-- Background gradient -->
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#0a0e1a"/>
+    <stop offset="50%" stop-color="#0d1220"/>
+    <stop offset="100%" stop-color="#0a0f1e"/>
+  </linearGradient>
+
+  <!-- Card gradients -->
+  <linearGradient id="cardBlue" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#1a2744" stop-opacity="0.9"/>
+    <stop offset="100%" stop-color="#141e35" stop-opacity="0.95"/>
+  </linearGradient>
+  <linearGradient id="gradGreen" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#00d2a0"/>
+    <stop offset="100%" stop-color="#00b894"/>
+  </linearGradient>
+  <linearGradient id="gradBlue" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#4facfe"/>
+    <stop offset="100%" stop-color="#3b82f6"/>
+  </linearGradient>
+  <linearGradient id="gradPurple" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#a78bfa"/>
+    <stop offset="100%" stop-color="#7c3aed"/>
+  </linearGradient>
+  <linearGradient id="gradOrange" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#fbbf24"/>
+    <stop offset="100%" stop-color="#f59e0b"/>
+  </linearGradient>
+  <linearGradient id="gradRed" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#fb7185"/>
+    <stop offset="100%" stop-color="#e11d48"/>
+  </linearGradient>
+  <linearGradient id="gradCyan" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#22d3ee"/>
+    <stop offset="100%" stop-color="#06b6d4"/>
+  </linearGradient>
+  <linearGradient id="gradGray" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#64748b"/>
+    <stop offset="100%" stop-color="#475569"/>
+  </linearGradient>
+
+  <!-- Glow filters -->
+  <filter id="glowGreen" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="6" result="blur"/>
+    <feFlood flood-color="#00d2a0" flood-opacity="0.3"/>
+    <feComposite in2="blur" operator="in"/>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glowBlue" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="6" result="blur"/>
+    <feFlood flood-color="#4facfe" flood-opacity="0.3"/>
+    <feComposite in2="blur" operator="in"/>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glowPurple" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="6" result="blur"/>
+    <feFlood flood-color="#a78bfa" flood-opacity="0.3"/>
+    <feComposite in2="blur" operator="in"/>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glowOrange" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="6" result="blur"/>
+    <feFlood flood-color="#fbbf24" flood-opacity="0.35"/>
+    <feComposite in2="blur" operator="in"/>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glowRed" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="6" result="blur"/>
+    <feFlood flood-color="#fb7185" flood-opacity="0.3"/>
+    <feComposite in2="blur" operator="in"/>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glowCyan" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="6" result="blur"/>
+    <feFlood flood-color="#22d3ee" flood-opacity="0.3"/>
+    <feComposite in2="blur" operator="in"/>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="shadowCard" x="-10%" y="-10%" width="125%" height="125%">
+    <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#000" flood-opacity="0.4"/>
+  </filter>
+  <filter id="shadowSmall" x="-10%" y="-10%" width="120%" height="120%">
+    <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+  </filter>
+
+  <!-- Arrow marker -->
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569"/>
+  </marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#00d2a0"/>
+  </marker>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#4facfe"/>
+  </marker>
+  <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#a78bfa"/>
+  </marker>
+  <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#fbbf24"/>
+  </marker>
+  <marker id="arrowDim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#334155"/>
+  </marker>
+
+  <!-- Dot grid pattern -->
+  <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+    <circle cx="15" cy="15" r="0.7" fill="#1e293b" opacity="0.6"/>
+  </pattern>
+</defs>
+
+<!-- Background -->
+<rect width="1600" height="2100" fill="url(#bg)"/>
+<rect width="1600" height="2100" fill="url(#dots)"/>
+
+<!-- Title -->
+<text x="800" y="52" text-anchor="middle" fill="#e2e8f0" font-size="28" font-weight="700" letter-spacing="1">INFERENCE PIPELINE</text>
+<text x="800" y="78" text-anchor="middle" fill="#64748b" font-size="14" letter-spacing="3" font-weight="500">MINDFU &#x2022; FUNCTIONAL FLOW</text>
+
+<!-- ==================== CLIENTS ==================== -->
+<g filter="url(#shadowCard)">
+  <rect x="470" y="105" width="660" height="95" rx="16" fill="url(#cardBlue)" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="800" y="127" text-anchor="middle" fill="#64748b" font-size="11" font-weight="600" letter-spacing="2">CLIENTS</text>
+  <!-- Vibe IDE -->
+  <rect x="500" y="138" width="150" height="46" rx="10" fill="url(#gradBlue)" filter="url(#glowBlue)" opacity="0.9"/>
+  <text x="575" y="158" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Vibe IDE</text>
+  <text x="575" y="174" text-anchor="middle" fill="#dbeafe" font-size="10" opacity="0.8">OpenAI API</text>
+  <!-- Claude CLI -->
+  <rect x="680" y="138" width="150" height="46" rx="10" fill="url(#gradBlue)" filter="url(#glowBlue)" opacity="0.9"/>
+  <text x="755" y="158" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Claude CLI</text>
+  <text x="755" y="174" text-anchor="middle" fill="#dbeafe" font-size="10" opacity="0.8">OpenAI API</text>
+  <!-- cURL -->
+  <rect x="860" y="138" width="150" height="46" rx="10" fill="url(#gradBlue)" filter="url(#glowBlue)" opacity="0.9"/>
+  <text x="935" y="158" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">cURL / API</text>
+  <text x="935" y="174" text-anchor="middle" fill="#dbeafe" font-size="10" opacity="0.8">OpenAI API</text>
+</g>
+
+<!-- Arrow: Clients -> Parse -->
+<path d="M 800 200 L 800 240" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+<!-- ==================== REQUEST PARSING ==================== -->
+<g filter="url(#shadowSmall)">
+  <rect x="640" y="245" width="320" height="60" rx="12" fill="url(#gradGray)" opacity="0.85"/>
+  <text x="800" y="270" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Request Parsing</text>
+  <text x="800" y="288" text-anchor="middle" fill="#cbd5e0" font-size="11">Pydantic validation &#x2022; Messages → dict</text>
+</g>
+
+<!-- Arrow: Parse -> Decision -->
+<path d="M 800 305 L 800 340" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+<!-- ==================== TOOLS CHECK (diamond) ==================== -->
+<g filter="url(#shadowSmall)">
+  <polygon points="800,340 870,380 800,420 730,380" fill="#1e293b" stroke="#fb7185" stroke-width="2"/>
+  <text x="800" y="377" text-anchor="middle" fill="#fecdd3" font-size="12" font-weight="700">Tools</text>
+  <text x="800" y="393" text-anchor="middle" fill="#fecdd3" font-size="12" font-weight="700">present?</text>
+</g>
+
+<!-- YES branch (left) - Disable RAG -->
+<path d="M 730 380 L 490 380" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#arrowDim)" fill="none"/>
+<text x="620" y="372" text-anchor="middle" fill="#fb7185" font-size="11" font-weight="600">YES</text>
+
+<g filter="url(#shadowSmall)">
+  <rect x="320" y="355" width="170" height="50" rx="10" fill="url(#gradRed)" filter="url(#glowRed)" opacity="0.85"/>
+  <text x="405" y="376" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">Disable RAG</text>
+  <text x="405" y="392" text-anchor="middle" fill="#fecdd3" font-size="10">+ Force non-streaming</text>
+</g>
+
+<!-- NO branch (down) - RAG check -->
+<path d="M 800 420 L 800 460" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+<text x="815" y="444" fill="#94a3b8" font-size="11" font-weight="600">NO</text>
+
+<!-- ==================== RAG CHECK (diamond) ==================== -->
+<g filter="url(#shadowSmall)">
+  <polygon points="800,460 865,497 800,534 735,497" fill="#1e293b" stroke="#00d2a0" stroke-width="2"/>
+  <text x="800" y="494" text-anchor="middle" fill="#a7f3d0" font-size="12" font-weight="700">RAG</text>
+  <text x="800" y="508" text-anchor="middle" fill="#a7f3d0" font-size="12" font-weight="700">enabled?</text>
+</g>
+
+<!-- NO branch (left) - skip to stream check -->
+<path d="M 735 497 L 490 497 L 490 900" stroke="#475569" stroke-width="1.5" stroke-dasharray="6,4" fill="none"/>
+<text x="620" y="490" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="600">NO</text>
+
+<!-- YES branch (down) -->
+<path d="M 800 534 L 800 570" stroke="#00d2a0" stroke-width="2" marker-end="url(#arrowGreen)" fill="none"/>
+<text x="815" y="556" fill="#00d2a0" font-size="11" font-weight="600">YES</text>
+
+<!-- ==================== RAG PIPELINE SECTION ==================== -->
+<g filter="url(#shadowCard)">
+  <rect x="530" y="565" width="540" height="340" rx="18" fill="#0f1b2d" stroke="#00d2a066" stroke-width="1.5" stroke-dasharray="0"/>
+  <!-- Section badge -->
+  <rect x="720" y="555" width="160" height="24" rx="12" fill="#00d2a0"/>
+  <text x="800" y="571" text-anchor="middle" fill="#0f1b2d" font-size="11" font-weight="800" letter-spacing="1">RAG PIPELINE</text>
+</g>
+
+<!-- Step 1: Extract query -->
+<g filter="url(#shadowSmall)">
+  <rect x="660" y="595" width="280" height="48" rx="10" fill="url(#gradGreen)" filter="url(#glowGreen)" opacity="0.9"/>
+  <text x="800" y="616" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Extract last user message</text>
+  <text x="800" y="632" text-anchor="middle" fill="#d1fae5" font-size="10">Reverse scan through messages</text>
+</g>
+
+<!-- Arrow -->
+<path d="M 800 643 L 800 660" stroke="#00d2a0" stroke-width="2" marker-end="url(#arrowGreen)" fill="none"/>
+
+<!-- Step 2: Embed -->
+<g filter="url(#shadowSmall)">
+  <rect x="660" y="663" width="280" height="48" rx="10" fill="url(#gradGreen)" filter="url(#glowGreen)" opacity="0.9"/>
+  <text x="800" y="683" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Embed query</text>
+  <text x="800" y="699" text-anchor="middle" fill="#d1fae5" font-size="10">sentence-transformers &#x2022; 384 dims</text>
+</g>
+
+<!-- Arrow -->
+<path d="M 800 711 L 800 728" stroke="#00d2a0" stroke-width="2" marker-end="url(#arrowGreen)" fill="none"/>
+
+<!-- Step 3: Vector search -->
+<g filter="url(#shadowSmall)">
+  <rect x="660" y="731" width="280" height="48" rx="10" fill="url(#gradPurple)" filter="url(#glowPurple)" opacity="0.9"/>
+  <text x="800" y="751" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Vector search</text>
+  <text x="800" y="767" text-anchor="middle" fill="#ede9fe" font-size="10">Qdrant &#x2022; COSINE similarity &#x2022; top_k</text>
+</g>
+
+<!-- Arrow -->
+<path d="M 800 779 L 800 796" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrowPurple)" fill="none"/>
+
+<!-- Step 4: Augment messages -->
+<g filter="url(#shadowSmall)">
+  <rect x="660" y="799" width="280" height="60" rx="10" fill="url(#gradGreen)" filter="url(#glowGreen)" opacity="0.9"/>
+  <text x="800" y="822" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Augment messages</text>
+  <text x="800" y="838" text-anchor="middle" fill="#d1fae5" font-size="10">Inject context into system prompt</text>
+  <text x="800" y="851" text-anchor="middle" fill="#d1fae5" font-size="10">Source attribution &#x2022; version-aware</text>
+</g>
+
+<!-- Arrow: RAG -> Stream check -->
+<path d="M 800 859 L 800 910" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+<!-- Disable RAG path joins here -->
+<path d="M 405 405 L 405 900 L 490 900" stroke="#475569" stroke-width="1.5" stroke-dasharray="6,4" fill="none"/>
+<!-- Skip RAG joins at stream check too -->
+<path d="M 490 900 L 490 940 L 720 940" stroke="#475569" stroke-width="1.5" fill="none"/>
+
+<!-- ==================== STREAM MODE CHECK ==================== -->
+<g filter="url(#shadowSmall)">
+  <polygon points="800,910 880,950 800,990 720,950" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="800" y="947" text-anchor="middle" fill="#fef3c7" font-size="12" font-weight="700">Stream</text>
+  <text x="800" y="963" text-anchor="middle" fill="#fef3c7" font-size="12" font-weight="700">mode?</text>
+</g>
+
+<!-- stream: false (left) -->
+<path d="M 720 950 L 560 950" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrowOrange)" fill="none"/>
+<text x="645" y="942" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="600">false</text>
+
+<g filter="url(#shadowSmall)">
+  <rect x="370" y="925" width="190" height="50" rx="10" fill="url(#gradOrange)" filter="url(#glowOrange)" opacity="0.9"/>
+  <text x="465" y="946" text-anchor="middle" fill="#451a03" font-size="12" font-weight="700">Standard POST</text>
+  <text x="465" y="962" text-anchor="middle" fill="#78350f" font-size="10">httpx async &#x2022; timeout 300s</text>
+</g>
+
+<!-- stream: true (right) -->
+<path d="M 880 950 L 1040 950" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrowOrange)" fill="none"/>
+<text x="955" y="942" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="600">true</text>
+
+<g filter="url(#shadowSmall)">
+  <rect x="1040" y="925" width="190" height="50" rx="10" fill="url(#gradOrange)" filter="url(#glowOrange)" opacity="0.9"/>
+  <text x="1135" y="946" text-anchor="middle" fill="#451a03" font-size="12" font-weight="700">Streaming POST</text>
+  <text x="1135" y="962" text-anchor="middle" fill="#78350f" font-size="10">httpx async stream &#x2022; SSE</text>
+</g>
+
+<!-- Arrows to LLM backend -->
+<path d="M 465 975 L 465 1040 L 650 1040" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M 1135 975 L 1135 1040 L 950 1040" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+<!-- ==================== LLM BACKEND ==================== -->
+<g filter="url(#shadowCard)">
+  <rect x="590" y="1005" width="420" height="125" rx="16" fill="url(#cardBlue)" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="800" y="1027" text-anchor="middle" fill="#64748b" font-size="11" font-weight="600" letter-spacing="2">LLM BACKEND &#x2022; :8000</text>
+</g>
+
+<!-- llama.cpp -->
+<g filter="url(#shadowSmall)">
+  <rect x="615" y="1040" width="175" height="70" rx="12" fill="#2d1f00" stroke="#f59e0b" stroke-width="1.5" filter="url(#glowOrange)"/>
+  <text x="702" y="1063" text-anchor="middle" fill="#fbbf24" font-size="14" font-weight="700">llama.cpp</text>
+  <text x="702" y="1080" text-anchor="middle" fill="#fde68a" font-size="10">GGUF Q4_K_M &#x2022; ~14 GB</text>
+  <text x="702" y="1095" text-anchor="middle" fill="#fcd34d" font-size="10" opacity="0.7">RTX 5080 &#x2022; 16 GB</text>
+</g>
+
+<!-- vLLM -->
+<g filter="url(#shadowSmall)">
+  <rect x="810" y="1040" width="175" height="70" rx="12" fill="#0c1e3d" stroke="#3b82f6" stroke-width="1.5" filter="url(#glowBlue)"/>
+  <text x="897" y="1063" text-anchor="middle" fill="#60a5fa" font-size="14" font-weight="700">vLLM</text>
+  <text x="897" y="1080" text-anchor="middle" fill="#bfdbfe" font-size="10">FP16 &#x2022; Mistral tokenizer</text>
+  <text x="897" y="1095" text-anchor="middle" fill="#93c5fd" font-size="10" opacity="0.7">L40S &#x2022; 128K context</text>
+</g>
+
+<!-- OR text between backends -->
+<text x="800" y="1080" text-anchor="middle" fill="#475569" font-size="12" font-weight="700">OR</text>
+
+<!-- Arrow: LLM -> Response -->
+<path d="M 800 1130 L 800 1180" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+<!-- ==================== RESPONSE PROCESSING ==================== -->
+<g filter="url(#shadowCard)">
+  <rect x="400" y="1175" width="800" height="180" rx="16" fill="url(#cardBlue)" stroke="#1e3a5f" stroke-width="1"/>
+  <rect x="700" y="1165" width="200" height="24" rx="12" fill="#475569"/>
+  <text x="800" y="1181" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="800" letter-spacing="1">RESPONSE PROCESSING</text>
+</g>
+
+<!-- Response type diamond -->
+<g>
+  <polygon points="800,1200 855,1230 800,1260 745,1230" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+  <text x="800" y="1234" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="700">TYPE?</text>
+</g>
+
+<!-- Standard JSON -->
+<path d="M 745 1230 L 530 1230 L 530 1270" stroke="#475569" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<g filter="url(#shadowSmall)">
+  <rect x="430" y="1273" width="200" height="55" rx="10" fill="url(#gradGray)" opacity="0.85"/>
+  <text x="530" y="1296" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">JSON Response</text>
+  <text x="530" y="1312" text-anchor="middle" fill="#cbd5e0" font-size="10">+ _rag_context metadata</text>
+</g>
+
+<!-- SSE Stream -->
+<path d="M 800 1260 L 800 1273" stroke="#475569" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+<g filter="url(#shadowSmall)">
+  <rect x="700" y="1273" width="200" height="55" rx="10" fill="url(#gradGray)" opacity="0.85"/>
+  <text x="800" y="1296" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">SSE Stream</text>
+  <text x="800" y="1312" text-anchor="middle" fill="#cbd5e0" font-size="10">data: chunks → client</text>
+</g>
+
+<!-- Error -->
+<path d="M 855 1230 L 1070 1230 L 1070 1270" stroke="#fb7185" stroke-width="1.5" fill="none" marker-end="url(#arrowDim)"/>
+<g filter="url(#shadowSmall)">
+  <rect x="970" y="1273" width="200" height="55" rx="10" fill="url(#gradRed)" opacity="0.8"/>
+  <text x="1070" y="1296" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">Error Handler</text>
+  <text x="1070" y="1312" text-anchor="middle" fill="#fecdd3" font-size="10">400 context / 408 timeout</text>
+</g>
+
+<!-- All responses -> Client -->
+<path d="M 530 1328 L 530 1400 L 730 1400" stroke="#475569" stroke-width="1.5" fill="none"/>
+<path d="M 800 1328 L 800 1400" stroke="#475569" stroke-width="1.5" fill="none"/>
+<path d="M 1070 1328 L 1070 1400 L 870 1400" stroke="#475569" stroke-width="1.5" fill="none"/>
+
+<g filter="url(#shadowSmall)">
+  <rect x="690" y="1380" width="220" height="50" rx="12" fill="url(#gradBlue)" filter="url(#glowBlue)" opacity="0.9"/>
+  <text x="800" y="1402" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Client Response</text>
+  <text x="800" y="1418" text-anchor="middle" fill="#dbeafe" font-size="10">OpenAI-compatible</text>
+</g>
+
+<!-- ==================== BACKGROUND LOGGING ==================== -->
+<!-- Dashed line from response to logging -->
+<path d="M 800 1430 L 800 1480" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,5" marker-end="url(#arrowDim)" fill="none"/>
+<text x="818" y="1460" fill="#475569" font-size="10" font-style="italic">async</text>
+
+<g filter="url(#shadowCard)">
+  <rect x="590" y="1480" width="420" height="120" rx="16" fill="#0f1b2d" stroke="#47556944" stroke-width="1"/>
+  <rect x="700" y="1470" width="200" height="24" rx="12" fill="#334155"/>
+  <text x="800" y="1487" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="800" letter-spacing="1">BACKGROUND LOGGING</text>
+</g>
+
+<g filter="url(#shadowSmall)">
+  <rect x="620" y="1505" width="165" height="42" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="702" y="1524" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="600">asyncio.create_task</text>
+  <text x="702" y="1539" text-anchor="middle" fill="#64748b" font-size="10">Non-blocking</text>
+</g>
+
+<path d="M 785 1526 L 820 1526" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" fill="none"/>
+
+<!-- PostgreSQL cylinder -->
+<g filter="url(#shadowSmall)" transform="translate(880,1500)">
+  <ellipse cx="50" cy="8" rx="50" ry="10" fill="#475569"/>
+  <rect x="0" y="8" width="100" height="40" fill="#3b4d63"/>
+  <ellipse cx="50" cy="48" rx="50" ry="10" fill="#334155"/>
+  <ellipse cx="50" cy="8" rx="50" ry="10" fill="#64748b"/>
+  <text x="50" y="28" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="700">PostgreSQL</text>
+  <text x="50" y="42" text-anchor="middle" fill="#94a3b8" font-size="9">conversations</text>
+</g>
+
+
+<!-- ==================== DOCUMENT INGESTION (RIGHT SIDE) ==================== -->
+<g filter="url(#shadowCard)">
+  <rect x="1140" y="105" width="400" height="540" rx="18" fill="#0f1b2d" stroke="#22d3ee33" stroke-width="1.5"/>
+  <rect x="1240" y="95" width="200" height="24" rx="12" fill="url(#gradCyan)"/>
+  <text x="1340" y="111" text-anchor="middle" fill="#083344" font-size="11" font-weight="800" letter-spacing="1">DOCUMENT INGESTION</text>
+</g>
+
+<!-- Upload -->
+<g filter="url(#shadowSmall)">
+  <rect x="1200" y="135" width="280" height="48" rx="10" fill="url(#gradCyan)" filter="url(#glowCyan)" opacity="0.9"/>
+  <text x="1340" y="156" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">POST /v1/documents/upload</text>
+  <text x="1340" y="172" text-anchor="middle" fill="#cffafe" font-size="10">PDF, DOCX, MD, TXT, code...</text>
+</g>
+
+<path d="M 1340 183 L 1340 200" stroke="#22d3ee" stroke-width="2" fill="none" marker-end="url(#arrowDim)"/>
+
+<!-- Extract -->
+<g filter="url(#shadowSmall)">
+  <rect x="1200" y="203" width="280" height="48" rx="10" fill="url(#gradGreen)" filter="url(#glowGreen)" opacity="0.85"/>
+  <text x="1340" y="224" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">Extract text</text>
+  <text x="1340" y="240" text-anchor="middle" fill="#d1fae5" font-size="10">pypdf &#x2022; python-docx &#x2022; BeautifulSoup</text>
+</g>
+
+<path d="M 1340 251 L 1340 268" stroke="#00d2a0" stroke-width="2" fill="none" marker-end="url(#arrowDim)"/>
+
+<!-- Dedup -->
+<g filter="url(#shadowSmall)">
+  <rect x="1200" y="271" width="280" height="48" rx="10" fill="url(#gradOrange)" filter="url(#glowOrange)" opacity="0.85"/>
+  <text x="1340" y="292" text-anchor="middle" fill="#451a03" font-size="12" font-weight="700">SHA-256 dedup check</text>
+  <text x="1340" y="308" text-anchor="middle" fill="#78350f" font-size="10">skip if unchanged &#x2022; re-insert if updated</text>
+</g>
+
+<path d="M 1340 319 L 1340 336" stroke="#fbbf24" stroke-width="2" fill="none" marker-end="url(#arrowDim)"/>
+
+<!-- Chunk -->
+<g filter="url(#shadowSmall)">
+  <rect x="1200" y="339" width="280" height="48" rx="10" fill="url(#gradGreen)" filter="url(#glowGreen)" opacity="0.85"/>
+  <text x="1340" y="360" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">Chunk text</text>
+  <text x="1340" y="376" text-anchor="middle" fill="#d1fae5" font-size="10">RecursiveCharacterTextSplitter &#x2022; 512/50</text>
+</g>
+
+<path d="M 1340 387 L 1340 404" stroke="#00d2a0" stroke-width="2" fill="none" marker-end="url(#arrowDim)"/>
+
+<!-- Batch embed -->
+<g filter="url(#shadowSmall)">
+  <rect x="1200" y="407" width="280" height="48" rx="10" fill="url(#gradGreen)" filter="url(#glowGreen)" opacity="0.85"/>
+  <text x="1340" y="428" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">Batch embed chunks</text>
+  <text x="1340" y="444" text-anchor="middle" fill="#d1fae5" font-size="10">sentence-transformers &#x2022; vectorized</text>
+</g>
+
+<path d="M 1340 455 L 1340 475" stroke="#00d2a0" stroke-width="2" fill="none" marker-end="url(#arrowDim)"/>
+
+<!-- Qdrant upsert cylinder -->
+<g filter="url(#shadowSmall)" transform="translate(1270,478)">
+  <ellipse cx="70" cy="10" rx="70" ry="12" fill="#7c3aed"/>
+  <rect x="0" y="10" width="140" height="50" fill="#6d28d9"/>
+  <ellipse cx="70" cy="60" rx="70" ry="12" fill="#5b21b6"/>
+  <ellipse cx="70" cy="10" rx="70" ry="12" fill="#a78bfa"/>
+  <text x="70" y="33" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">Qdrant upsert</text>
+  <text x="70" y="49" text-anchor="middle" fill="#ede9fe" font-size="10">vector + payload per chunk</text>
+</g>
+
+<!-- Connection: Qdrant <-> RAG Pipeline vector search -->
+<path d="M 1270 540 L 1100 540 L 1100 755 L 940 755" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6,4" fill="none" opacity="0.6"/>
+<text x="1100" y="650" fill="#a78bfa" font-size="10" font-weight="600" transform="rotate(-90,1100,650)" text-anchor="middle">shared vector store</text>
+
+<!-- ==================== LEGEND ==================== -->
+<g transform="translate(60,1650)">
+  <rect x="0" y="0" width="350" height="200" rx="14" fill="#0f1b2d" stroke="#1e3a5f" stroke-width="1" filter="url(#shadowCard)"/>
+  <text x="175" y="28" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="700" letter-spacing="1">LEGEND</text>
+
+  <rect x="20" y="45" width="40" height="16" rx="4" fill="url(#gradGreen)"/>
+  <text x="72" y="57" fill="#cbd5e0" font-size="11">RAG / Data processing</text>
+
+  <rect x="20" y="72" width="40" height="16" rx="4" fill="url(#gradBlue)"/>
+  <text x="72" y="84" fill="#cbd5e0" font-size="11">Client / API layer</text>
+
+  <rect x="20" y="99" width="40" height="16" rx="4" fill="url(#gradPurple)"/>
+  <text x="72" y="111" fill="#cbd5e0" font-size="11">Vector database (Qdrant)</text>
+
+  <rect x="20" y="126" width="40" height="16" rx="4" fill="url(#gradOrange)"/>
+  <text x="72" y="138" fill="#cbd5e0" font-size="11">LLM calls / filtering</text>
+
+  <rect x="20" y="153" width="40" height="16" rx="4" fill="url(#gradRed)"/>
+  <text x="72" y="165" fill="#cbd5e0" font-size="11">Error / disable paths</text>
+
+  <rect x="20" y="180" width="40" height="16" rx="4" fill="url(#gradCyan)"/>
+  <text x="72" y="192" fill="#cbd5e0" font-size="11">Document ingestion</text>
+</g>
+
+<!-- ==================== FOOTER ==================== -->
+<text x="800" y="2075" text-anchor="middle" fill="#334155" font-size="12" font-weight="500" letter-spacing="1">MINDFU &#x2022; INFERENCE ARCHITECTURE &#x2022; 2025</text>
+
+</svg>

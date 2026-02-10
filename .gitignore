@@ -50,6 +50,9 @@ backups/
 .DS_Store
 Thumbs.db
 
+# MCP config
+.mcp.json
+
 # Docker
 *.log
 
