@@ -20,18 +20,25 @@ curl http://localhost:8080/health
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Docker Network                              │
-├─────────────────┬─────────────────┬─────────────────────────────┤
-│   LLM Server    │   Qdrant        │   Training Service          │
-│   (vLLM)        │   (Vector DB)   │   (Unsloth + MLflow)        │
-│   Port: 8000    │   Port: 6333    │   Port: 5001                │
-├─────────────────┴─────────────────┴─────────────────────────────┤
-│                    RAG Service (FastAPI)                         │
-│                    Port: 8080                                    │
-└─────────────────────────────────────────────────────────────────┘
-```
+### Inference Pipeline
+
+Client requests flow through the RAG service, which augments prompts with relevant context from Qdrant before forwarding to the LLM backend (llama.cpp or vLLM).
+
+<p align="center">
+  <a href="docs/inference-flow.svg">
+    <img src="docs/inference-flow.svg" alt="Inference Pipeline" width="800"/>
+  </a>
+</p>
+
+### Training Pipeline
+
+Conversations are exported from PostgreSQL, filtered, formatted, then used to QLoRA fine-tune Devstral-24B with 4-bit quantization. Experiments are tracked in MLflow.
+
+<p align="center">
+  <a href="docs/training-flow.svg">
+    <img src="docs/training-flow.svg" alt="Training Pipeline" width="800"/>
+  </a>
+</p>
 
 ## Endpoints
 
