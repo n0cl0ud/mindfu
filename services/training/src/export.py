@@ -79,7 +79,7 @@ class ModelExporter:
         # Find all .bin files
         for bin_file in model_path.glob("*.bin"):
             logger.info(f"Converting {bin_file.name}")
-            state_dict = torch.load(bin_file, map_location="cpu")
+            state_dict = torch.load(bin_file, map_location="cpu", weights_only=True)
             safetensor_file = output_path / bin_file.name.replace(".bin", ".safetensors")
             save_file(state_dict, str(safetensor_file))
 

@@ -228,7 +228,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
     except Exception as e:
         logger.exception("Chat completion error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def stream_response(
@@ -261,7 +261,7 @@ async def stream_response(
         logger.exception("Streaming error")
         error_data = {
             "error": {
-                "message": str(e),
+                "message": "Internal server error",
                 "type": "server_error",
             }
         }

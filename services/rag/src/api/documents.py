@@ -167,7 +167,7 @@ async def upload_document(request: DocumentUploadRequest):
 
     except Exception as e:
         logger.exception("Document upload error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 def _process_batch_sync(documents: List[dict]) -> dict:
@@ -265,7 +265,7 @@ async def upload_documents_batch(documents: List[DocumentUploadRequest]):
 
     except Exception as e:
         logger.exception("Batch upload error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/documents/upload", response_model=DocumentUploadResponse)
@@ -278,6 +278,16 @@ async def upload_file(
 
     Supported formats: txt, md, py, js, ts, json, yaml, html, pdf, docx
     """
+    # Enforce file size limit (100MB)
+    MAX_FILE_SIZE = 100 * 1024 * 1024
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB",
+        )
+    await file.seek(0)
+
     filename = file.filename or "unknown"
     ext = os.path.splitext(filename)[1].lower()
 
@@ -301,7 +311,7 @@ async def upload_file(
 
     except Exception as e:
         logger.exception("File upload error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/documents/query", response_model=DocumentQueryResponse)
@@ -337,7 +347,7 @@ async def query_documents(request: DocumentQueryRequest):
 
     except Exception as e:
         logger.exception("Document query error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # =============================================================================
@@ -365,7 +375,7 @@ async def list_collections():
 
     except Exception as e:
         logger.exception("List collections error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/collections")
@@ -389,7 +399,7 @@ async def create_collection(request: CollectionCreateRequest):
 
     except Exception as e:
         logger.exception("Create collection error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/collections/{name}")
@@ -403,7 +413,7 @@ async def delete_collection(name: str):
 
     except Exception as e:
         logger.exception("Delete collection error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/collections/{name}/stats")
@@ -426,4 +436,4 @@ async def get_collection_stats(name: str):
 
     except Exception as e:
         logger.exception("Get collection stats error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

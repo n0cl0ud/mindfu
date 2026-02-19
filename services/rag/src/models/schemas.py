@@ -55,7 +55,7 @@ class ChatCompletionRequest(BaseModel):
     """OpenAI-compatible chat completion request."""
 
     model: str = "devstral-small-2"
-    messages: List[ChatMessage]
+    messages: List[ChatMessage] = Field(max_length=256)
     temperature: float = Field(default=0.7, ge=0, le=2)
     max_tokens: Optional[int] = Field(default=2048, ge=1)
     stream: bool = False
@@ -120,7 +120,7 @@ class DocumentChunk(BaseModel):
 class DocumentUploadRequest(BaseModel):
     """Request to upload a document."""
 
-    content: str
+    content: str = Field(max_length=10_000_000)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     collection: Optional[str] = None
     chunk: bool = Field(default=True, description="Whether to chunk the document")
@@ -137,7 +137,7 @@ class DocumentUploadResponse(BaseModel):
 class DocumentQueryRequest(BaseModel):
     """Request to query documents."""
 
-    query: str
+    query: str = Field(max_length=10_000)
     collection: Optional[str] = None
     top_k: int = Field(default=5, ge=1, le=100)
 
@@ -174,7 +174,7 @@ class CollectionInfo(BaseModel):
 class CollectionCreateRequest(BaseModel):
     """Request to create a collection."""
 
-    name: str
+    name: str = Field(min_length=1, max_length=255, pattern=r"^[a-zA-Z0-9_-]+$")
     vector_size: Optional[int] = None
 
 
