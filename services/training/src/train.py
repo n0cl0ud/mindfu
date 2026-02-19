@@ -363,16 +363,16 @@ def main():
 def run_api(config: TrainingConfig):
     """Run training as an API service."""
     from fastapi import BackgroundTasks, FastAPI, HTTPException
-    from pydantic import BaseModel
+    from pydantic import BaseModel, Field
     import uvicorn
 
     app = FastAPI(title="MindFu Training Service")
 
     class TrainRequest(BaseModel):
-        experiment_name: str | None = None
-        lora_rank: int | None = None
-        num_epochs: int | None = None
-        learning_rate: float | None = None
+        experiment_name: Optional[str] = Field(default=None, max_length=256, pattern=r"^[a-zA-Z0-9_-]+$")
+        lora_rank: Optional[int] = Field(default=None, ge=4, le=512)
+        num_epochs: Optional[int] = Field(default=None, ge=1, le=100)
+        learning_rate: Optional[float] = Field(default=None, ge=1e-7, le=1.0)
 
     training_status = {"running": False, "last_run": None, "error": None}
 
@@ -409,7 +409,7 @@ def run_api(config: TrainingConfig):
                     "timestamp": datetime.now().isoformat(),
                 }
             except Exception as e:
-                training_status["error"] = str(e)
+                training_status["error"] = "Training failed. Check server logs."
                 logger.exception("Training failed")
             finally:
                 training_status["running"] = False

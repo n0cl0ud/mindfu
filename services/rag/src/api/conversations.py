@@ -123,7 +123,7 @@ async def list_conversations(
 
     except Exception as e:
         logger.exception("List conversations error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/conversations/stats", response_model=StatsResponse)
@@ -136,7 +136,7 @@ async def get_stats():
 
     except Exception as e:
         logger.exception("Get stats error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.patch("/conversations/{conversation_id}/quality")
@@ -151,11 +151,11 @@ async def update_quality(conversation_id: str, request: QualityUpdateRequest):
 
         return {"message": f"Quality set to '{request.quality}'", "conversation_id": conversation_id}
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid quality value")
     except Exception as e:
         logger.exception("Update quality error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/conversations/save-to-rag")
@@ -216,7 +216,7 @@ async def save_to_rag(request: SaveToRAGRequest):
         raise
     except Exception as e:
         logger.exception("Save to RAG error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/conversations/export")
@@ -282,7 +282,7 @@ async def export_conversations(request: ExportRequest):
         raise
     except Exception as e:
         logger.exception("Export error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/conversations/{conversation_id}")
@@ -306,4 +306,4 @@ async def delete_conversation(conversation_id: str):
         raise
     except Exception as e:
         logger.exception("Delete conversation error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

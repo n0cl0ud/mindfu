@@ -38,6 +38,15 @@ services:
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
       - QDRANT__SERVICE__MAX_REQUEST_SIZE_MB=100
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - mindfu-network
     restart: unless-stopped
@@ -56,6 +65,10 @@ services:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mindfu}"]
       interval: 10s
@@ -76,6 +89,10 @@ services:
       - redis-data:/data
     ports:
       - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -101,6 +118,15 @@ services:
       - mlflow-artifacts:/mlflow
     ports:
       - "5000:5000"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     profiles:
       - training
     networks:
@@ -175,6 +201,10 @@ services:
       - embedding-cache:/root/.cache/huggingface
     ports:
       - "11434:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     depends_on:
       qdrant:
         condition: service_started
@@ -283,6 +313,10 @@ services:
       - embedding-cache:/root/.cache/huggingface
     ports:
       - "11434:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     depends_on:
       qdrant:
         condition: service_started
@@ -383,6 +417,10 @@ services:
       - embedding-cache:/root/.cache/huggingface
     ports:
       - "11434:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     depends_on:
       qdrant:
         condition: service_started
